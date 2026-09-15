@@ -84,7 +84,7 @@ export default function LandingPage() {
         </div>
       </main>
 
-      <footer className={`overflow-hidden bg-site pt-[clamp(2.5rem,5vw,4rem)] ${GUTTER}`}>
+      <footer className={`bg-site py-[clamp(2.5rem,5vw,4rem)] ${GUTTER}`}>
         <div className="mx-auto w-full max-w-[92rem]">
           <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-2 border-t-[1.5px] border-hairline pt-5 text-[0.76rem] text-muted">
             <p className="max-w-[40rem]">
@@ -103,9 +103,6 @@ export default function LandingPage() {
               <Attribution />
             </p>
           </div>
-          <p aria-hidden className="footer-wordmark mt-10 -mb-[0.12em]">
-            Show&amp;Tell
-          </p>
         </div>
       </footer>
     </div>
