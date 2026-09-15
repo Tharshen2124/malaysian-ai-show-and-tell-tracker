@@ -1,0 +1,60 @@
+"use client";
+
+import { use, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useQuery } from "convex/react";
+import { ArrowLeft } from "lucide-react";
+import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
+import { useAccess } from "@/lib/use-access";
+import { MemberForm } from "@/components/forms/member-form";
+import { ErrorState } from "@/components/ui/error-state";
+
+export default function MemberEditPage({ params }: PageProps<"/members/[id]/edit">) {
+  const { id } = use(params);
+  const router = useRouter();
+  const { isLoading, isAdmin } = useAccess();
+  const member = useQuery(api.members.get, isAdmin ? { id: id as Id<"members"> } : "skip");
+
+  // Admin-only route: bounce non-admins back to the detail page.
+  useEffect(() => {
+    if (!isLoading && !isAdmin) router.replace(`/members/${id}`);
+  }, [isLoading, isAdmin, router, id]);
+
+  if (!isAdmin) return null;
+  if (member === null) {
+    return <ErrorState message="This member does not exist (they may have been deleted)." />;
+  }
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-6">
+      <Link
+        href={`/members/${id}`}
+        className="inline-flex items-center gap-1.5 text-[0.82rem] text-muted transition-colors hover:text-ink"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to member
+      </Link>
+      <h1 className="page-title">Edit member</h1>
+      {member === undefined ? (
+        <div className="h-64 animate-pulse rounded-panel bg-recessed" />
+      ) : (
+        <div className="card-surface p-6">
+          <MemberForm
+            initial={{
+              id: member._id,
+              name: member.name,
+              email: member.email,
+              isActive: member.isActive,
+              registerDate: member.registerDate,
+              accessLevel: member.accessLevel ?? "none",
+            }}
+            onSaved={() => router.push(`/members/${id}`)}
+            onCancel={() => router.push(`/members/${id}`)}
+          />
+        </div>
+      )}
+    </div>
+  );
+}

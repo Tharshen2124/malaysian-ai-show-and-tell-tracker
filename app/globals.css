@@ -1,26 +1,317 @@
 @import "tailwindcss";
 
+/*
+ * Malaysian AI design system — see design.md. Every colour is authored once as
+ * a light-dark() pair, so the two themes share structure and differ only in
+ * value. `color-scheme` decides which half resolves: the OS by default, or the
+ * choice the theme toggle stamped on <html> as data-theme.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light dark;
+  font-synthesis: none;
+
+  /* Faces. next/font sets the --font-* variables on <html>. */
+  --face-display: var(--font-instrument-serif), "Times New Roman", serif;
+  --face-body: var(--font-atkinson), Arial, sans-serif;
+  --face-pixel: var(--font-mondwest), "Times New Roman", serif;
+  --leading-body: 1.6;
+
+  /* Surfaces */
+  --page-background: light-dark(#f4efe6, #06090f);
+  --site-background: light-dark(#efe8d8, #07101a);
+  --surface-background: light-dark(#e7dfd0, #0a1422);
+  --card-background: light-dark(#fffaf2, #0b1422);
+  --card-raised: light-dark(#fffaf2, #0a111c);
+  --scrim: light-dark(#102b2a59, #000000a3);
+
+  /* Text */
+  --page-text: light-dark(#102b2a, #e0e8f4);
+  --text-heading: light-dark(#0c2221, #f4f7fc);
+  --text-accent: light-dark(#2c5c59, #a9c7ef);
+  --text-link: light-dark(#1d4f5c, #b7c9e2);
+  --link-bright: light-dark(#102b2a, #dce9fb);
+  --text-muted: light-dark(#4d6664, #8da7ca);
+  --text-soft: light-dark(#102b2ab8, #e0e8f4b8);
+  --text-faint: light-dark(#102b2a73, #e0e8f480);
+
+  /* Lines */
+  --border-color: light-dark(#8a9e9b, #7398cf);
+  --hairline: light-dark(#102b2a29, #7398cf8c);
+  --hairline-soft: light-dark(#102b2a1f, #7398cf52);
+
+  /* Buttons and focus */
+  --button-background: light-dark(#102b2a, #fff);
+  --button-hover-background: light-dark(#1a3d3b, #edf0f4);
+  --button-text: light-dark(#f4efe6, #101820);
+  --focus-color: light-dark(#102b2a, #97b8e7);
+  --accent-line: #315d9f; /* fixed brand blue — never theme-swapped */
+  --footer-wordmark-color: light-dark(#102b2a1a, #9bbbe72e);
+
+  /*
+   * State. design.md ships no semantic set because the marketing site never
+   * shows validation; the tracker needs one. Each hue is rotated into the same
+   * muted, printed register (saturation held under ~60%), and each colour comes
+   * with a soft tint and a line so it never has to be a solid fill.
+   */
+  --danger: light-dark(#9b3b36, #e39a94);
+  --danger-soft: light-dark(#f4e3dd, #2a1517);
+  --danger-line: light-dark(#9b3b3647, #e39a9459);
+  --success: light-dark(#2f6b4f, #8fc9a8);
+  --success-soft: light-dark(#e2ece1, #0e2119);
+  --success-line: light-dark(#2f6b4f47, #8fc9a859);
+  --info: var(--text-accent);
+  --info-soft: light-dark(#e3ebe4, #0c1a2c);
+  --info-line: light-dark(#2c5c5947, #a9c7ef59);
+  --warn: light-dark(#8a5a14, #ffd29a);
+  --warn-soft: light-dark(#f5e8d0, #2a1e0c);
+  --warn-line: light-dark(#8a5a1447, #ffd29a59);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-page: var(--page-background);
+  --color-site: var(--site-background);
+  --color-recessed: var(--surface-background);
+  --color-card: var(--card-background);
+  --color-card-raised: var(--card-raised);
+  --color-scrim: var(--scrim);
+
+  --color-ink: var(--page-text);
+  --color-heading: var(--text-heading);
+  --color-accent: var(--text-accent);
+  --color-link: var(--text-link);
+  --color-link-bright: var(--link-bright);
+  --color-muted: var(--text-muted);
+  --color-soft: var(--text-soft);
+  --color-faint: var(--text-faint);
+
+  --color-line: var(--border-color);
+  --color-hairline: var(--hairline);
+  --color-hairline-soft: var(--hairline-soft);
+
+  --color-button: var(--button-background);
+  --color-button-hover: var(--button-hover-background);
+  --color-on-button: var(--button-text);
+  --color-focus: var(--focus-color);
+  --color-brand: var(--accent-line);
+
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-line: var(--danger-line);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-line: var(--success-line);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-info-line: var(--info-line);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-warn-line: var(--warn-line);
+
+  --font-sans: var(--face-body);
+  --font-display: var(--face-display);
+  --font-pixel: var(--face-pixel);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@theme {
+  /* design.md's one dominant phone breakpoint. */
+  --breakpoint-sm: 43.75rem;
+
+  --radius-button: 0.45rem;
+  --radius-media: 0.7rem;
+  --radius-panel: 0.95rem;
+
+  /* Level 2 — floating menus. The dark-mode ring keeps the lifted edge visible on ink navy. */
+  --shadow-float: 0 0.75rem 1.75rem #00000057, 0 0 0 1px light-dark(#0000, #aeccf24d);
+
+  --ease-settle: cubic-bezier(0.2, 0.75, 0.2, 1);
+
+  --animate-soft-rise: soft-rise 0.7s ease-out both;
+
+  @keyframes soft-rise {
+    from {
+      opacity: 0;
+      transform: translateY(0.75rem);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  body {
+    background-color: var(--page-background);
+    color: var(--page-text);
+    font-family: var(--face-body);
+    line-height: var(--leading-body);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* Every heading is Instrument Serif at 400 — emphasis comes from size and tightness, never bold. */
+  h1,
+  h2,
+  h3 {
+    font-family: var(--face-display);
+    font-weight: 400;
+    line-height: 0.9;
+    letter-spacing: -0.035em;
+    color: var(--text-heading);
+    text-wrap: balance;
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus-color);
+    outline-offset: 3px;
+  }
+
+  ::selection {
+    background: var(--page-text);
+    color: var(--page-background);
+  }
+
+  /* Nothing may be stranded invisible or left flickering. */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 1ms !important;
+      animation-delay: 0ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 1ms !important;
+    }
+  }
+}
+
+/* design.md's single button primitive. Variants are composed in components/ui/button.ts. */
+@utility site-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  min-height: 2.25rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: var(--radius-button);
+  font-family: var(--face-body);
+  font-size: 0.82rem;
+  font-weight: 400;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 0.18s,
+    color 0.18s,
+    border-color 0.18s,
+    opacity 0.18s,
+    transform 0.18s;
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  /* design.md's touch-target fix: 44px on phones, unchanged on desktop. */
+  @media (width < 43.75rem) {
+    min-height: 2.75rem;
+  }
+}
+
+/* Structural surface: flat, separated by a hairline, never a resting shadow. */
+@utility card-surface {
+  background-color: var(--card-background);
+  border: 1.5px solid var(--hairline);
+  border-radius: var(--radius-panel);
+}
+
+@utility field-input {
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0.55rem 0.75rem;
+  background-color: var(--card-background);
+  border: 1.5px solid var(--hairline);
+  border-radius: var(--radius-button);
+  color: var(--page-text);
+  font-size: 0.875rem;
+  line-height: 1.4;
+  transition: border-color 0.18s;
+
+  &::placeholder {
+    color: var(--text-faint);
+  }
+  &:hover:not(:disabled) {
+    border-color: var(--border-color);
+  }
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  /* 44px to tap, and 16px text so iOS does not zoom the page on focus. */
+  @media (width < 43.75rem) {
+    min-height: 2.75rem;
+    font-size: 1rem;
+  }
+}
+
+/* Uppercase section label — the inverse of the headings' negative tracking. */
+@utility kicker {
+  font-family: var(--face-body);
+  font-size: 0.7rem;
+  font-weight: 400;
+  line-height: 1.4;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-accent);
+}
+
+@utility page-title {
+  font-size: clamp(2.3rem, 3.8vw, 3.6rem);
+  line-height: 0.9;
+}
+
+@utility section-title {
+  font-size: clamp(1.6rem, 2.4vw, 2.2rem);
+  line-height: 0.9;
+}
+
+/* Big figures (stats, metrics, the presenter clock) share the display face. */
+@utility display-figure {
+  font-family: var(--face-display);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The ghost wordmark that anchors a footer. */
+@utility footer-wordmark {
+  font-family: var(--face-body);
+  font-size: clamp(6rem, 14vw, 14rem);
+  line-height: 0.72;
+  letter-spacing: -0.06em;
+  white-space: nowrap;
+  user-select: none;
+  color: var(--footer-wordmark-color);
+
+  @media (width <= 620px) {
+    white-space: normal;
+    font-size: clamp(5rem, 23vw, 8rem);
+    line-height: 0.76;
+  }
 }

@@ -1,0 +1,37 @@
+import { query } from "./_generated/server";
+import { requireMember } from "./lib/auth";
+import { listMeetupsInner } from "./meetups";
+import { listMembersInner } from "./members";
+
+export const summary = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireMember(ctx);
+
+    const meetupsPage = await listMeetupsInner(ctx, { page: 1, pageSize: 4 });
+    const membersPage = await listMembersInner(ctx, {
+      isActive: true,
+      sortBy: "recent_talks",
+      page: 1,
+      pageSize: 8,
+    });
+
+    const [allMembers, allMeetups, allProjects, allUpdates] = await Promise.all([
+      ctx.db.query("members").collect(),
+      ctx.db.query("meetups").collect(),
+      ctx.db.query("projects").collect(),
+      ctx.db.query("updates").collect(),
+    ]);
+
+    return {
+      recentMeetups: meetupsPage.meetups,
+      activeMembers: membersPage.data,
+      stats: {
+        memberCount: allMembers.length,
+        meetupCount: allMeetups.length,
+        projectCount: allProjects.length,
+        updateCount: allUpdates.length,
+      },
+    };
+  },
+});
