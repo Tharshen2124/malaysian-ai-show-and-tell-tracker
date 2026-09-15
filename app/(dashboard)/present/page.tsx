@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
-import { Lock, QrCode } from "lucide-react";
+import { Play, QrCode } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useAccess } from "@/lib/use-access";
@@ -53,7 +53,8 @@ export default function PresentPage() {
     <div>
       <h1 className="page-title">So, who presents first?</h1>
       <p className="mt-3 text-sm text-soft">
-        Put the QR code on the screen, let people scan in, set the order, then run the clock.
+        Put the QR code on the screen, let people scan in, set the order, then run the clock. The
+        code stays up during the talks for anyone who turns up late.
       </p>
     </div>
   );
@@ -96,59 +97,70 @@ export default function PresentPage() {
     );
   }
 
-  if (session.status === "locked") {
-    return (
-      <div className="space-y-8">
-        <PresenterTimer
-          order={session.signups}
-          currentIndex={session.currentIndex ?? 0}
-          onAdvance={async (index) => {
-            try {
-              await setCurrentIndex({ sessionId: session._id, index });
-            } catch {
-              toast.error("Could not move to the next presenter.");
-            }
-          }}
-          presentationMinutes={session.presentationMinutes}
-          feedbackMinutes={session.feedbackMinutes}
-          onReopen={async () => {
-            try {
-              await setStatus({ sessionId: session._id, status: "collecting" });
-            } catch {
-              toast.error("Could not reopen sign-ups.");
-            }
-          }}
-          onFinish={async () => {
-            try {
-              await setStatus({ sessionId: session._id, status: "done" });
-              toast.success("Session finished.");
-            } catch {
-              toast.error("Could not finish the session.");
-            }
-          }}
-        />
-      </div>
-    );
-  }
+  // "locked" is the stored name for talks being under way; sign-ups and the
+  // queue behind the current talk both stay open.
+  const presenting = session.status === "locked";
+  // Clamped: a name removed mid-session must not leave the pointer past the end.
+  const currentIndex = Math.min(
+    Math.max(session.currentIndex ?? 0, 0),
+    Math.max(session.signups.length - 1, 0),
+  );
 
-  const lock = async () => {
+  const beginTalks = async () => {
     try {
       await setStatus({ sessionId: session._id, status: "locked" });
     } catch {
-      toast.error("Could not lock the order.");
+      toast.error("Could not start the presentations.");
     }
   };
 
+  // One tree for both phases, so the QR code stays put, without a flicker, when
+  // the talks start.
   return (
     <div className="space-y-8">
-      {heading}
+      {!presenting && heading}
 
       <div className="grid gap-8 lg:grid-cols-2">
-        <QrPanel code={session.code} />
+        {/* Below the clock on a narrow screen, where the clock is what the admin needs. */}
+        <div className={presenting ? "max-lg:order-last" : undefined}>
+          <QrPanel code={session.code} />
+        </div>
 
         <div className="space-y-6">
+          {presenting && (
+            <PresenterTimer
+              order={session.signups}
+              currentIndex={currentIndex}
+              onAdvance={async (index) => {
+                try {
+                  await setCurrentIndex({ sessionId: session._id, index });
+                } catch {
+                  toast.error("Could not move to the next presenter.");
+                }
+              }}
+              presentationMinutes={session.presentationMinutes}
+              feedbackMinutes={session.feedbackMinutes}
+              onReopen={async () => {
+                try {
+                  await setStatus({ sessionId: session._id, status: "collecting" });
+                } catch {
+                  toast.error("Could not go back to setup.");
+                }
+              }}
+              onFinish={async () => {
+                try {
+                  await setStatus({ sessionId: session._id, status: "done" });
+                  toast.success("Session finished.");
+                } catch {
+                  toast.error("Could not finish the session.");
+                }
+              }}
+            />
+          )}
+
           <RosterList
             signups={session.signups}
+            currentIndex={presenting ? currentIndex : undefined}
             onReorder={async (orderedIds: Id<"presentSignups">[]) => {
               try {
                 await reorder({ sessionId: session._id, orderedIds });
@@ -165,31 +177,35 @@ export default function PresentPage() {
             }}
           />
 
-          <DurationFields
-            key={`${session.presentationMinutes}-${session.feedbackMinutes}`}
-            presentationMinutes={session.presentationMinutes}
-            feedbackMinutes={session.feedbackMinutes}
-            onCommit={async (presentation, feedbackMinutes) => {
-              try {
-                await updateDurations({
-                  sessionId: session._id,
-                  presentationMinutes: presentation,
-                  feedbackMinutes,
-                });
-              } catch {
-                toast.error("Could not save the timings.");
-              }
-            }}
-          />
+          {!presenting && (
+            <>
+              <DurationFields
+                key={`${session.presentationMinutes}-${session.feedbackMinutes}`}
+                presentationMinutes={session.presentationMinutes}
+                feedbackMinutes={session.feedbackMinutes}
+                onCommit={async (presentation, feedbackMinutes) => {
+                  try {
+                    await updateDurations({
+                      sessionId: session._id,
+                      presentationMinutes: presentation,
+                      feedbackMinutes,
+                    });
+                  } catch {
+                    toast.error("Could not save the timings.");
+                  }
+                }}
+              />
 
-          <button
-            onClick={lock}
-            disabled={session.signups.length === 0}
-            className={`${buttonClass("primary")} w-full py-3`}
-          >
-            <Lock className="h-4 w-4" />
-            Lock the order &amp; start
-          </button>
+              <button
+                onClick={beginTalks}
+                disabled={session.signups.length === 0}
+                className={`${buttonClass("primary")} w-full py-3`}
+              >
+                <Play className="h-4 w-4" />
+                Start presentations
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

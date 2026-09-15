@@ -150,17 +150,18 @@ export default function JoinPage({ params }: PageProps<"/join/[code]">) {
 
       {!loading && session && place && <AttendeePlace place={place} />}
 
-      {!loading && session && !place && session.status !== "collecting" && (
+      {!loading && session && !place && session.status === "done" && (
         <div className="card-surface flex flex-col items-center gap-3 px-6 py-12 text-center">
           <Lock className="h-8 w-8 text-faint" />
           <p className="text-sm text-muted">
-            Sign-ups are closed — the order is already set. Have a word with an organiser if you
+            Sign-ups are closed — this session has wrapped up. Have a word with an organiser if you
             still want a slot.
           </p>
         </div>
       )}
 
-      {!loading && session && !place && session.status === "collecting" && (
+      {/* Still open once talks have started: latecomers join the back of the queue. */}
+      {!loading && session && !place && session.status !== "done" && (
         <form onSubmit={submit} className="space-y-4">
           {error && <InlineErrorBanner message={error} />}
           <label className="block">

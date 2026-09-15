@@ -12,7 +12,9 @@ export const accessLevelValidator = v.union(v.literal("member"), v.literal("admi
 /** Where a Scan & Order session is in its life: collecting names, then presenting. */
 export const presentStatusValidator = v.union(
   v.literal("collecting"), // the QR is up and phones may submit
-  v.literal("locked"), // order frozen, talks under way
+  // Talks under way. The name predates it, but phones may still submit and the
+  // queue behind the current talk may still be rearranged.
+  v.literal("locked"),
   v.literal("done"),
 );
 

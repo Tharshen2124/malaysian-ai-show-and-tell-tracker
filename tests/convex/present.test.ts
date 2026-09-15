@@ -49,10 +49,27 @@ describe("present.join — the anonymous scan path", () => {
     ).rejects.toThrow("Unknown session");
   });
 
-  it("rejects a name once the order is locked", async () => {
+  it("still takes a latecomer once talks are under way, at the back of the queue", async () => {
     const t = convexTest(schema, modules);
     const { admin, sessionId, code } = await startSession(t);
+    for (const name of ["Aiden", "Janelle"]) {
+      await t.mutation(api.present.join, { code, name });
+    }
     await admin.mutation(api.present.setStatus, { sessionId, status: "locked" });
+    await admin.mutation(api.present.setCurrentIndex, { sessionId, index: 1 });
+
+    const latecomer = await t.mutation(api.present.join, { code, name: "Latecomer" });
+
+    expect(await namesInOrder(admin)).toEqual(["Aiden", "Janelle", "Latecomer"]);
+    expect(
+      (await t.query(api.present.myPlace, { code, signupId: latecomer }))!.state,
+    ).toBe("next");
+  });
+
+  it("rejects a name once the session is finished", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId, code } = await startSession(t);
+    await admin.mutation(api.present.setStatus, { sessionId, status: "done" });
 
     await expect(
       t.mutation(api.present.join, { code, name: "Latecomer" }),
@@ -167,6 +184,59 @@ describe("present.reorder", () => {
       }),
     ).rejects.toThrow("Order is out of date");
   });
+
+  /** Four people, talks started, Janelle (index 1) on stage. */
+  async function midSession(t: ReturnType<typeof convexTest>) {
+    const started = await startSession(t);
+    const { admin, sessionId, code } = started;
+    const ids = [];
+    for (const name of ["Aiden", "Janelle", "Hesham", "Latecomer"]) {
+      ids.push(await t.mutation(api.present.join, { code, name }));
+    }
+    await admin.mutation(api.present.setStatus, { sessionId, status: "locked" });
+    await admin.mutation(api.present.setCurrentIndex, { sessionId, index: 1 });
+    return { ...started, ids };
+  }
+
+  it("lets the queue behind the current talk be rearranged mid-session", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId, code, ids } = await midSession(t);
+    const [aiden, janelle, hesham, latecomer] = ids;
+
+    await admin.mutation(api.present.reorder, {
+      sessionId,
+      orderedIds: [aiden, janelle, latecomer, hesham],
+    });
+
+    expect(await namesInOrder(admin)).toEqual(["Aiden", "Janelle", "Latecomer", "Hesham"]);
+    expect((await t.query(api.present.myPlace, { code, signupId: janelle }))!.state).toBe(
+      "presenting",
+    );
+    expect((await t.query(api.present.myPlace, { code, signupId: latecomer }))!.state).toBe(
+      "next",
+    );
+  });
+
+  it("refuses to move anyone who has presented or is presenting", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId, ids } = await midSession(t);
+    const [aiden, janelle, hesham, latecomer] = ids;
+
+    // Aiden, already done, pulled back in behind Janelle.
+    await expect(
+      admin.mutation(api.present.reorder, {
+        sessionId,
+        orderedIds: [janelle, aiden, hesham, latecomer],
+      }),
+    ).rejects.toThrow("Only people still waiting can be moved");
+    // Janelle, on stage, pushed down the queue.
+    await expect(
+      admin.mutation(api.present.reorder, {
+        sessionId,
+        orderedIds: [aiden, hesham, janelle, latecomer],
+      }),
+    ).rejects.toThrow("Only people still waiting can be moved");
+  });
 });
 
 describe("present.removeSignup", () => {
@@ -183,6 +253,30 @@ describe("present.removeSignup", () => {
     const after = (await admin.query(api.present.activeSession, {}))!.signups;
     expect(after.map((s) => s.name)).toEqual(["Janelle", "Hesham"]);
     expect(after.map((s) => s.position)).toEqual([0, 1]);
+  });
+
+  it("keeps the same person on stage when a name above them is removed", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId, code } = await startSession(t);
+    const ids = [];
+    for (const name of ["Aiden", "Janelle", "Hesham"]) {
+      ids.push(await t.mutation(api.present.join, { code, name }));
+    }
+    const [aiden, janelle, hesham] = ids;
+    await admin.mutation(api.present.setStatus, { sessionId, status: "locked" });
+    await admin.mutation(api.present.setCurrentIndex, { sessionId, index: 1 });
+
+    // Someone who already presented is taken off the list.
+    await admin.mutation(api.present.removeSignup, { id: aiden });
+
+    expect((await admin.query(api.present.activeSession, {}))!.currentIndex).toBe(0);
+    expect((await t.query(api.present.myPlace, { code, signupId: janelle }))!.state).toBe(
+      "presenting",
+    );
+
+    // Someone still waiting leaves the pointer where it is.
+    await admin.mutation(api.present.removeSignup, { id: hesham });
+    expect((await admin.query(api.present.activeSession, {}))!.currentIndex).toBe(0);
   });
 });
 

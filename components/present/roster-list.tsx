@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDown, ArrowUp, GripVertical, Shuffle, Trash2, Users } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, GripVertical, Mic, Shuffle, Trash2, Users } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
 import { buttonClass, iconButtonClass } from "@/components/ui/button";
 
@@ -23,15 +23,25 @@ function shuffle<T>(items: T[]): T[] {
 
 interface RosterListProps {
   signups: Signup[];
+  /**
+   * Whose turn it is, once talks have started. Everyone up to and including
+   * this row is pinned — `present.reorder` refuses to move them — and only the
+   * queue behind can be rearranged. Omitted while the order is still being set.
+   */
+  currentIndex?: number;
   onReorder: (orderedIds: Id<"presentSignups">[]) => void;
   onRemove: (id: Id<"presentSignups">) => void;
 }
 
-export function RosterList({ signups, onReorder, onRemove }: RosterListProps) {
+export function RosterList({ signups, currentIndex, onReorder, onRemove }: RosterListProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const presenting = currentIndex !== undefined;
+  // Rows above this index have presented or are presenting now.
+  const frozen = presenting ? Math.min(currentIndex + 1, signups.length) : 0;
+  const waiting = signups.length - frozen;
 
   const move = (from: number, to: number) => {
-    if (to < 0 || to >= signups.length || from === to) return;
+    if (from < frozen || to < frozen || to >= signups.length || from === to) return;
     const next = [...signups];
     const [moved] = next.splice(from, 1);
     next.splice(to, 0, moved);
@@ -48,9 +58,12 @@ export function RosterList({ signups, onReorder, onRemove }: RosterListProps) {
           </span>
         </h2>
         <button
-          onClick={() => onReorder(shuffle(signups).map((s) => s._id))}
-          disabled={signups.length < 2}
+          onClick={() =>
+            onReorder([...signups.slice(0, frozen), ...shuffle(signups.slice(frozen))].map((s) => s._id))
+          }
+          disabled={waiting < 2}
           className={buttonClass("outline")}
+          title={presenting ? "Shuffle everyone still waiting" : undefined}
         >
           <Shuffle className="h-3.5 w-3.5" />
           Shuffle
@@ -67,54 +80,81 @@ export function RosterList({ signups, onReorder, onRemove }: RosterListProps) {
       ) : (
         <>
           <ol className="space-y-1.5">
-            {signups.map((signup, i) => (
-              <li
-                key={signup._id}
-                draggable
-                onDragStart={() => setDragIndex(i)}
-                onDragEnd={() => setDragIndex(null)}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={() => {
-                  if (dragIndex !== null) move(dragIndex, i);
-                  setDragIndex(null);
-                }}
-                className={`flex items-center gap-2 rounded-media border-[1.5px] bg-card px-3 py-2 text-sm ${
-                  dragIndex === i ? "border-line opacity-60" : "border-hairline"
-                }`}
-              >
-                <span className="w-5 text-faint tabular-nums">{i + 1}.</span>
-                <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-faint" />
-                <span className="min-w-0 flex-1 truncate">{signup.name}</span>
-                {/* Keyboard-reachable equivalent of dragging. */}
-                <span className="flex shrink-0 items-center gap-0.5">
-                  <button
-                    aria-label={`Move ${signup.name} up`}
-                    onClick={() => move(i, i - 1)}
-                    disabled={i === 0}
-                    className={iconButtonClass()}
+            {signups.map((signup, i) => {
+              if (i < frozen) {
+                const now = i === currentIndex;
+                return (
+                  <li
+                    key={signup._id}
+                    className={`flex items-center gap-2 rounded-media border-[1.5px] px-3 py-2 text-sm ${
+                      now ? "border-success-line bg-success-soft text-success" : "border-hairline text-faint"
+                    }`}
                   >
-                    <ArrowUp className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    aria-label={`Move ${signup.name} down`}
-                    onClick={() => move(i, i + 1)}
-                    disabled={i === signups.length - 1}
-                    className={iconButtonClass()}
-                  >
-                    <ArrowDown className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    aria-label={`Remove ${signup.name}`}
-                    onClick={() => onRemove(signup._id)}
-                    className={`${iconButtonClass("danger")} ml-1`}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </span>
-              </li>
-            ))}
+                    <span className="w-5 tabular-nums">{i + 1}.</span>
+                    {now ? (
+                      <Mic className="h-4 w-4 shrink-0" />
+                    ) : (
+                      <Check className="h-4 w-4 shrink-0" />
+                    )}
+                    <span className="min-w-0 flex-1 truncate">{signup.name}</span>
+                    {now && <span className="kicker shrink-0">Now</span>}
+                  </li>
+                );
+              }
+
+              return (
+                <li
+                  key={signup._id}
+                  draggable
+                  onDragStart={() => setDragIndex(i)}
+                  onDragEnd={() => setDragIndex(null)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => {
+                    if (dragIndex !== null) move(dragIndex, i);
+                    setDragIndex(null);
+                  }}
+                  className={`flex items-center gap-2 rounded-media border-[1.5px] bg-card px-3 py-2 text-sm ${
+                    dragIndex === i ? "border-line opacity-60" : "border-hairline"
+                  }`}
+                >
+                  <span className="w-5 text-faint tabular-nums">{i + 1}.</span>
+                  <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-faint" />
+                  <span className="min-w-0 flex-1 truncate">{signup.name}</span>
+                  {/* Keyboard-reachable equivalent of dragging. */}
+                  <span className="flex shrink-0 items-center gap-0.5">
+                    <button
+                      aria-label={`Move ${signup.name} up`}
+                      onClick={() => move(i, i - 1)}
+                      disabled={i === frozen}
+                      className={iconButtonClass()}
+                    >
+                      <ArrowUp className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      aria-label={`Move ${signup.name} down`}
+                      onClick={() => move(i, i + 1)}
+                      disabled={i === signups.length - 1}
+                      className={iconButtonClass()}
+                    >
+                      <ArrowDown className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      aria-label={`Remove ${signup.name}`}
+                      onClick={() => onRemove(signup._id)}
+                      className={`${iconButtonClass("danger")} ml-1`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
+                </li>
+              );
+            })}
           </ol>
-          <p className="text-xs text-faint">Drag rows, or use ↑ ↓, to set the order.</p>
+          <p className="text-xs text-faint">
+            {presenting
+              ? "Drag rows, or use ↑ ↓, to change who's up next. Latecomers who scan in join the bottom."
+              : "Drag rows, or use ↑ ↓, to set the order."}
+          </p>
         </>
       )}
     </section>

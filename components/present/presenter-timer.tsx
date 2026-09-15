@@ -17,27 +17,28 @@ import type { Signup } from "./roster-list";
 
 interface PresenterTimerProps {
   order: Signup[];
-  /** Whose turn it is. Held on the session so attendees' phones can see it too. */
+  /**
+   * Whose turn it is, already clamped to the roster. Held on the session so
+   * attendees' phones can see it too.
+   */
   currentIndex: number;
   onAdvance: (index: number) => void;
   presentationMinutes: number;
   feedbackMinutes: number;
-  /** Reopen sign-ups and go back to arranging the order. */
+  /** Stop the talks and go back to setting the order and timings. */
   onReopen: () => void;
   onFinish: () => void;
 }
 
 export function PresenterTimer({
   order,
-  currentIndex,
+  currentIndex: current,
   onAdvance,
   presentationMinutes,
   feedbackMinutes,
   onReopen,
   onFinish,
 }: PresenterTimerProps) {
-  // Clamped: a name removed mid-session must not leave the pointer past the end.
-  const current = Math.min(Math.max(currentIndex, 0), Math.max(order.length - 1, 0));
   const timer = usePresenterTimer(presentationMinutes, feedbackMinutes);
   // Only worth holding while the clock is actually running.
   useWakeLock(timer.running);
@@ -52,13 +53,15 @@ export function PresenterTimer({
     timer.reset();
   };
 
+  // The whole list was removed mid-session. The QR is still up, so the next
+  // person to scan in picks up from here.
   if (!presenter) {
     return (
       <div className="space-y-6">
-        <p className="text-sm text-muted">Nobody signed up for this session.</p>
+        <p className="text-sm text-muted">Nobody is on the list right now.</p>
         <button onClick={onReopen} className={buttonClass("outline")}>
           <ArrowLeft className="h-4 w-4" />
-          Reopen sign-ups
+          Back to setup
         </button>
       </div>
     );
@@ -76,10 +79,11 @@ export function PresenterTimer({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <button
           onClick={onReopen}
+          title="Back to setting the order and timings. Talks restart from the top."
           className="inline-flex items-center gap-1.5 text-[0.82rem] text-muted transition-colors hover:text-ink"
         >
           <ArrowLeft className="h-4 w-4" />
-          Reopen sign-ups
+          Back to setup
         </button>
         <p className="text-sm text-faint tabular-nums">
           {current + 1} of {order.length}
@@ -151,25 +155,6 @@ export function PresenterTimer({
           )}
         </div>
       </div>
-
-      <section>
-        <h2 className="kicker mb-3">Up next</h2>
-        {isLast ? (
-          <p className="text-sm text-faint">Nobody left — that was the last talk.</p>
-        ) : (
-          <ol className="space-y-1.5">
-            {order.slice(current + 1).map((signup, i) => (
-              <li
-                key={signup._id}
-                className="rounded-media border-[1.5px] border-hairline bg-card px-4 py-2.5 text-sm"
-              >
-                <span className="mr-2 text-faint tabular-nums">{current + i + 2}.</span>
-                {signup.name}
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
     </div>
   );
 }

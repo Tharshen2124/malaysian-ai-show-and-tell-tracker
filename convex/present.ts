@@ -139,7 +139,7 @@ export const reorder = mutation({
   },
   handler: async (ctx, { sessionId, orderedIds }) => {
     await requireAdmin(ctx);
-    await requireSession(ctx, sessionId);
+    const session = await requireSession(ctx, sessionId);
 
     const existing = await signupsInOrder(ctx, sessionId);
     // A stale list from a tab that missed a late arrival would silently drop or
@@ -150,6 +150,18 @@ export const reorder = mutation({
     }
     for (const row of existing) {
       if (!seen.has(row._id)) throw new Error("Order is out of date — refresh and try again");
+    }
+
+    // Mid-session, only the queue behind the current talk may move. Shuffling
+    // someone who has presented back into it would give them a second turn, and
+    // moving the person on stage would swap names under a running clock.
+    if (session.status === "locked") {
+      const frozen = Math.min((session.currentIndex ?? 0) + 1, existing.length);
+      for (let i = 0; i < frozen; i++) {
+        if (orderedIds[i] !== existing[i]._id) {
+          throw new Error("Only people still waiting can be moved");
+        }
+      }
     }
 
     for (let i = 0; i < orderedIds.length; i++) {
@@ -165,6 +177,7 @@ export const removeSignup = mutation({
     await requireAdmin(ctx);
     const row = await ctx.db.get(id);
     if (!row) throw new Error("Signup not found");
+    const removedIndex = (await signupsInOrder(ctx, row.sessionId)).findIndex((s) => s._id === id);
     await ctx.db.delete(id);
 
     // Re-pack, so positions stay contiguous and the next `reorder` lines up.
@@ -173,6 +186,20 @@ export const removeSignup = mutation({
       if (remaining[i].position !== i) {
         await ctx.db.patch(remaining[i]._id, { position: i, updatedAt: Date.now() });
       }
+    }
+
+    // The turn pointer is an index, so removing someone above it would hand the
+    // stage to the next person mid-talk. Pull it up with the rows instead.
+    const session = await ctx.db.get(row.sessionId);
+    if (
+      session?.status === "locked" &&
+      session.currentIndex !== undefined &&
+      removedIndex < session.currentIndex
+    ) {
+      await ctx.db.patch(session._id, {
+        currentIndex: session.currentIndex - 1,
+        updatedAt: Date.now(),
+      });
     }
     return null;
   },
@@ -251,7 +278,9 @@ export const join = mutation({
   handler: async (ctx, { code, name }) => {
     const session = await sessionByCodeDoc(ctx, code);
     if (!session) throw new Error("Unknown session");
-    if (session.status !== "collecting") throw new Error("Sign-ups are closed");
+    // Stragglers keep turning up after the talks start, so the door only shuts
+    // once the session is finished.
+    if (session.status === "done") throw new Error("Sign-ups are closed");
 
     const trimmed = name.trim();
     if (trimmed === "") throw new Error("Name is required");
@@ -266,7 +295,7 @@ export const join = mutation({
     }
 
     // Late arrivals go to the bottom rather than into the middle of an order the
-    // admin may already have set.
+    // admin may already have set — or ahead of someone who has already presented.
     const position = existing.reduce((max, row) => Math.max(max, row.position + 1), 0);
     // Handed back so the phone can watch its own place in the queue. It is the
     // holder's own row, so it discloses nothing the sender did not just write.
