@@ -32,7 +32,7 @@ export function MeetupCard({ meetup }: { meetup: MeetupListItem }) {
         onClick={() => setOpen(true)}
         className="card-surface w-full p-4 text-left transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-line"
       >
-        <h3 className="text-[1.6rem]">{title}</h3>
+        <h3 className="text-[1.2rem]">{title}</h3>
         <dl className="mt-3 space-y-1.5 text-sm text-muted">
           <div className="flex items-center gap-2">
             <CalendarDays className="h-4 w-4 text-faint" />

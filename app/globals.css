@@ -157,14 +157,23 @@
     overflow-x: hidden;
   }
 
-  /* Every heading is Instrument Serif at 400 — emphasis comes from size and tightness, never bold. */
-  h1,
-  h2,
-  h3 {
+  /* Page headers are Instrument Serif at 400 — emphasis comes from size and tightness, never bold. */
+  h1 {
     font-family: var(--face-display);
     font-weight: 400;
     line-height: 0.9;
     letter-spacing: -0.035em;
+    color: var(--text-heading);
+    text-wrap: balance;
+  }
+
+  /* Everything below a page header is set in Atkinson; bold carries the hierarchy. */
+  h2,
+  h3 {
+    font-family: var(--face-body);
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
     color: var(--text-heading);
     text-wrap: balance;
   }
@@ -287,14 +296,14 @@
 }
 
 @utility section-title {
-  font-size: clamp(1.6rem, 2.4vw, 2.2rem);
-  line-height: 0.9;
+  font-size: clamp(1.3rem, 1.9vw, 1.6rem);
+  line-height: 1.2;
 }
 
-/* Big figures (stats, metrics, the presenter clock) share the display face. */
+/* Big figures (stats, metrics, the presenter clock) are set in the body face. */
 @utility display-figure {
-  font-family: var(--face-display);
-  font-weight: 400;
+  font-family: var(--face-body);
+  font-weight: 700;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }

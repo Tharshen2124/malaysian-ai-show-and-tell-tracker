@@ -88,7 +88,7 @@ export function PresenterTimer({
 
       <div className={`rounded-panel border-[1.5px] p-8 text-center transition-colors duration-300 ${tone}`}>
         <p className="kicker">Now presenting</p>
-        <p className="mt-2 font-display text-[clamp(2.5rem,5vw,3.75rem)] leading-[0.9] tracking-[-0.035em] text-heading text-balance">
+        <p className="mt-2 text-[clamp(2rem,4vw,3rem)] leading-[1.1] font-bold tracking-[-0.01em] text-heading text-balance">
           {presenter.name}
         </p>
 

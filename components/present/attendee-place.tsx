@@ -124,7 +124,7 @@ function Card({
       }`}
     >
       {icon}
-      <p className="font-display text-[2.2rem] leading-[0.95] tracking-[-0.035em] text-balance">
+      <p className="text-[1.75rem] leading-tight font-bold tracking-[-0.01em] text-balance">
         {title}
       </p>
       {children}

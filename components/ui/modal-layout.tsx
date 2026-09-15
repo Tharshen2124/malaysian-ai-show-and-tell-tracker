@@ -95,7 +95,7 @@ export function ModalLayout({
             }`}
           >
             <div className="flex items-center justify-between gap-3 border-b border-hairline px-5 py-4">
-              <h2 className="text-[1.65rem] leading-[0.95]">{title}</h2>
+              <h2 className="text-[1.25rem]">{title}</h2>
               <div className="flex shrink-0 items-center gap-1">
                 {headerActions}
                 <button aria-label="Close" onClick={onClose} className={iconButtonClass()}>

@@ -70,7 +70,7 @@ export default function LoginPage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.5, ease: [0.2, 0.75, 0.2, 1] }}
-            className="max-w-[30rem] font-display text-[clamp(2.3rem,3.8vw,3.6rem)] leading-[0.95] tracking-[-0.035em] text-heading italic text-balance"
+            className="max-w-[30rem] text-[clamp(1.75rem,2.8vw,2.6rem)] leading-[1.15] tracking-[-0.01em] text-heading text-balance"
           >
             “{QUOTES[slide]}”
           </motion.p>

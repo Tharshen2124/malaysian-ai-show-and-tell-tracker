@@ -62,7 +62,7 @@ export function MemberCard({ member }: { member: MemberListItem }) {
         className="card-surface w-full p-4 text-left transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-line"
       >
         <div className="flex items-start justify-between gap-2">
-          <h3 className="text-[1.6rem]">{member.name}</h3>
+          <h3 className="text-[1.2rem]">{member.name}</h3>
           <StatusPill isActive={member.isActive} />
         </div>
         <div className="mt-4 space-y-2">
@@ -97,7 +97,7 @@ function ProjectSection({ project }: { project: MemberProject }) {
     <div className="rounded-media border border-hairline bg-card p-3.5">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="font-display text-[1.35rem] leading-tight tracking-[-0.035em] text-heading">
+          <p className="text-[1.05rem] leading-tight font-bold text-heading">
             {project.name}
           </p>
           <p className="text-xs text-faint">

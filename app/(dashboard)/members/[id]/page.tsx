@@ -106,7 +106,7 @@ export default function MemberDetailPage({ params }: PageProps<"/members/[id]">)
             {member.projects.map((project) => (
               <div key={project._id} className="card-surface p-5">
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <h3 className="text-[1.6rem]">{project.name}</h3>
+                  <h3 className="text-[1.25rem]">{project.name}</h3>
                   <span className="text-xs text-faint">
                     {PROJECT_CATEGORY_LABELS[project.category]}
                     {project.completed ? " · Completed" : ""} ·{" "}
