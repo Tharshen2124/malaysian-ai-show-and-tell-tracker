@@ -18,8 +18,8 @@ import type { Signup } from "./roster-list";
 interface PresenterTimerProps {
   order: Signup[];
   /**
-   * Whose turn it is, already clamped to the roster. Held on the session so
-   * attendees' phones can see it too.
+   * Whose turn it is, clamped to 0..order.length — one past the end means
+   * nobody is on stage. Held on the session so attendees' phones can see it too.
    */
   currentIndex: number;
   onAdvance: (index: number) => void;
@@ -53,16 +53,29 @@ export function PresenterTimer({
     timer.reset();
   };
 
-  // The whole list was removed mid-session. The QR is still up, so the next
-  // person to scan in picks up from here.
+  // Nobody on stage: the list was emptied, or the last presenter was removed.
+  // The QR is still up, so the next person to scan in picks up from here.
   if (!presenter) {
+    const everyoneHadATurn = order.length > 0;
     return (
-      <div className="space-y-6">
-        <p className="text-sm text-muted">Nobody is on the list right now.</p>
-        <button onClick={onReopen} className={buttonClass("outline")}>
-          <ArrowLeft className="h-4 w-4" />
-          Back to setup
-        </button>
+      <div className="space-y-5 rounded-panel border-[1.5px] border-dashed border-hairline px-6 py-10 text-center">
+        <p className="text-sm text-muted">
+          {everyoneHadATurn
+            ? "That's everyone on the list. Anyone who scans in now goes straight up."
+            : "Nobody is on the list right now. The next person to scan in goes first."}
+        </p>
+        <div className="flex flex-wrap justify-center gap-2">
+          <button onClick={onReopen} className={buttonClass("outline")}>
+            <ArrowLeft className="h-4 w-4" />
+            Back to setup
+          </button>
+          {everyoneHadATurn && (
+            <button onClick={onFinish} className={buttonClass("success-outline")}>
+              <CheckCircle2 className="h-4 w-4" />
+              Finish session
+            </button>
+          )}
+        </div>
       </div>
     );
   }

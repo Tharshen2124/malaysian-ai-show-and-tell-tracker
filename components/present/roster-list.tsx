@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowDown, ArrowUp, Check, GripVertical, Mic, Shuffle, Trash2, Users } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
 import { buttonClass, iconButtonClass } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export interface Signup {
   _id: Id<"presentSignups">;
@@ -21,6 +22,17 @@ function shuffle<T>(items: T[]): T[] {
   return out;
 }
 
+/** What taking this row off the list does to the room, in the admin's terms. */
+function removalWarning(name: string, index: number, currentIndex: number | undefined): string {
+  if (currentIndex !== undefined && index === currentIndex) {
+    return `${name} is presenting right now. Removing them hands over to whoever is next, and the clock starts again.`;
+  }
+  if (currentIndex !== undefined && index < currentIndex) {
+    return `${name} has already presented. Nobody else's turn changes.`;
+  }
+  return `${name} comes off the list. If they still want a slot, they can scan in again and join the bottom.`;
+}
+
 interface RosterListProps {
   signups: Signup[];
   /**
@@ -30,11 +42,14 @@ interface RosterListProps {
    */
   currentIndex?: number;
   onReorder: (orderedIds: Id<"presentSignups">[]) => void;
-  onRemove: (id: Id<"presentSignups">) => void;
+  onRemove: (id: Id<"presentSignups">) => Promise<void> | void;
 }
 
 export function RosterList({ signups, currentIndex, onReorder, onRemove }: RosterListProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  // A stray tap on a bin icon would silently wipe someone's place, and their
+  // phone with it, so every removal is confirmed.
+  const [removing, setRemoving] = useState<{ signup: Signup; index: number } | null>(null);
   const presenting = currentIndex !== undefined;
   // Rows above this index have presented or are presenting now.
   const frozen = presenting ? Math.min(currentIndex + 1, signups.length) : 0;
@@ -47,6 +62,17 @@ export function RosterList({ signups, currentIndex, onReorder, onRemove }: Roste
     next.splice(to, 0, moved);
     onReorder(next.map((s) => s._id));
   };
+
+  const removeButton = (signup: Signup, index: number) => (
+    <button
+      aria-label={`Remove ${signup.name}`}
+      title="Remove from the list"
+      onClick={() => setRemoving({ signup, index })}
+      className={`${iconButtonClass("danger")} ml-1`}
+    >
+      <Trash2 className="h-3.5 w-3.5" />
+    </button>
+  );
 
   return (
     <section className="space-y-3">
@@ -98,6 +124,7 @@ export function RosterList({ signups, currentIndex, onReorder, onRemove }: Roste
                     )}
                     <span className="min-w-0 flex-1 truncate">{signup.name}</span>
                     {now && <span className="kicker shrink-0">Now</span>}
+                    {removeButton(signup, i)}
                   </li>
                 );
               }
@@ -138,13 +165,7 @@ export function RosterList({ signups, currentIndex, onReorder, onRemove }: Roste
                     >
                       <ArrowDown className="h-3.5 w-3.5" />
                     </button>
-                    <button
-                      aria-label={`Remove ${signup.name}`}
-                      onClick={() => onRemove(signup._id)}
-                      className={`${iconButtonClass("danger")} ml-1`}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    {removeButton(signup, i)}
                   </span>
                 </li>
               );
@@ -157,6 +178,19 @@ export function RosterList({ signups, currentIndex, onReorder, onRemove }: Roste
           </p>
         </>
       )}
+
+      <ConfirmDialog
+        open={removing !== null}
+        onClose={() => setRemoving(null)}
+        title={removing ? `Remove ${removing.signup.name}?` : "Remove from the list?"}
+        description={
+          removing ? removalWarning(removing.signup.name, removing.index, currentIndex) : ""
+        }
+        confirmLabel="Remove"
+        onConfirm={async () => {
+          if (removing) await onRemove(removing.signup._id);
+        }}
+      />
     </section>
   );
 }

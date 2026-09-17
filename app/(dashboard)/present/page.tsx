@@ -100,11 +100,10 @@ export default function PresentPage() {
   // "locked" is the stored name for talks being under way; sign-ups and the
   // queue behind the current talk both stay open.
   const presenting = session.status === "locked";
-  // Clamped: a name removed mid-session must not leave the pointer past the end.
-  const currentIndex = Math.min(
-    Math.max(session.currentIndex ?? 0, 0),
-    Math.max(session.signups.length - 1, 0),
-  );
+  // One past the end is allowed and meaningful: the last presenter was removed,
+  // so everyone has had a turn and the next person to scan in goes straight up.
+  const currentIndex = Math.min(Math.max(session.currentIndex ?? 0, 0), session.signups.length);
+  const presenterId = session.signups[currentIndex]?._id ?? "nobody";
 
   const beginTalks = async () => {
     try {
@@ -129,6 +128,9 @@ export default function PresentPage() {
         <div className="space-y-6">
           {presenting && (
             <PresenterTimer
+              // A fresh clock whenever someone new is on stage — including when
+              // the presenter is removed, or another admin's tab moves things on.
+              key={presenterId}
               order={session.signups}
               currentIndex={currentIndex}
               onAdvance={async (index) => {

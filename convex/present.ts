@@ -190,6 +190,9 @@ export const removeSignup = mutation({
 
     // The turn pointer is an index, so removing someone above it would hand the
     // stage to the next person mid-talk. Pull it up with the rows instead.
+    // Removing the presenter themselves leaves it where it is on purpose: the
+    // next person steps up, or — if they were last — it sits one past the end,
+    // which reads as everyone done until a latecomer scans in.
     const session = await ctx.db.get(row.sessionId);
     if (
       session?.status === "locked" &&
@@ -341,14 +344,29 @@ export const myPlace = query({
       else if (index === current + 1) state = "next";
     }
 
-    // Still no roster: their own name and number, the size of the room, and
-    // whose turn it is relative to them. Nobody else's name crosses the wire.
+    // One past the end is legitimate — the last presenter was removed — and
+    // means nobody is on stage rather than that the first person is.
+    const currentNumber = current !== null && current < signups.length ? current + 1 : null;
+
+    // The running order, as it reads on the screen at the front of the room.
+    // These names are already on the projector in front of everyone, and a phone
+    // that cannot see the list has no way to judge how close its turn is. Holding
+    // the code is still what gates the read, and nothing here identifies anyone
+    // beyond the name they typed in themselves.
+    const roster = signups.map((row, i) => ({
+      name: row.name,
+      number: i + 1,
+      isYou: row._id === id,
+    }));
+
     return {
       name: mine.name,
       position: index + 1,
       total: signups.length,
       state,
       status: session.status,
+      currentNumber,
+      roster,
     };
   },
 });

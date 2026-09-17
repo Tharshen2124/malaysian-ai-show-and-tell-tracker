@@ -10,6 +10,7 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { Wordmark } from "@/components/ui/wordmark";
 import { AttendeePlace } from "@/components/present/attendee-place";
 import { useChime } from "@/lib/use-chime";
+import { useWakeLock } from "@/lib/use-wake-lock";
 
 const schema = z.object({
   name: z.string().trim().min(1, "Name is required").max(60, "That name is too long"),
@@ -88,6 +89,11 @@ export default function JoinPage({ params }: PageProps<"/join/[code]">) {
   // A `null` answer means the id is stale — an old session, or a name the admin
   // has since removed — and simply falls through to the sign-up form below.
   const place = useQuery(api.present.myPlace, signupId ? { code, signupId } : "skip");
+
+  // A phone that has gone to sleep cannot buzz, chime, or raise the "you're up
+  // next" popup, so the screen is held awake from the moment they have a place
+  // until their turn has been and gone. A no-op where it is unsupported.
+  useWakeLock(place != null && place.state !== "done");
 
   // Phones will not play a sound that no gesture ever asked for. Submitting is
   // the obvious gesture; this covers the case where they reopen the page later,

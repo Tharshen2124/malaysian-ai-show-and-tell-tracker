@@ -278,6 +278,43 @@ describe("present.removeSignup", () => {
     await admin.mutation(api.present.removeSignup, { id: hesham });
     expect((await admin.query(api.present.activeSession, {}))!.currentIndex).toBe(0);
   });
+
+  it("hands the stage to the next person when the presenter is removed", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId, code } = await startSession(t);
+    const ids = [];
+    for (const name of ["Aiden", "Janelle", "Hesham"]) {
+      ids.push(await t.mutation(api.present.join, { code, name }));
+    }
+    const [, janelle, hesham] = ids;
+    await admin.mutation(api.present.setStatus, { sessionId, status: "locked" });
+    await admin.mutation(api.present.setCurrentIndex, { sessionId, index: 1 });
+
+    await admin.mutation(api.present.removeSignup, { id: janelle });
+
+    expect((await t.query(api.present.myPlace, { code, signupId: hesham }))!.state).toBe(
+      "presenting",
+    );
+  });
+
+  it("leaves nobody on stage when the last presenter is removed, until someone scans in", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId, code } = await startSession(t);
+    const aiden = await t.mutation(api.present.join, { code, name: "Aiden" });
+    const janelle = await t.mutation(api.present.join, { code, name: "Janelle" });
+    await admin.mutation(api.present.setStatus, { sessionId, status: "locked" });
+    await admin.mutation(api.present.setCurrentIndex, { sessionId, index: 1 });
+
+    await admin.mutation(api.present.removeSignup, { id: janelle });
+
+    // Aiden already had a turn and must not be buzzed back on stage.
+    expect((await t.query(api.present.myPlace, { code, signupId: aiden }))!.state).toBe("done");
+
+    const latecomer = await t.mutation(api.present.join, { code, name: "Latecomer" });
+    expect((await t.query(api.present.myPlace, { code, signupId: latecomer }))!.state).toBe(
+      "presenting",
+    );
+  });
 });
 
 describe("present.createSession", () => {
@@ -332,18 +369,58 @@ describe("present.myPlace — what an attendee's phone sees", () => {
       total: 3,
       state: "waiting",
       status: "collecting",
+      // Nobody is on stage until the admin locks the order.
+      currentNumber: null,
+      roster: [
+        { name: "Aiden", number: 1, isYou: false },
+        { name: "Janelle", number: 2, isYou: true },
+        { name: "Hesham", number: 3, isYou: false },
+      ],
     });
   });
 
-  it("never discloses anyone else's name", async () => {
+  it("hands back the running order, with the caller's own row flagged", async () => {
     const t = convexTest(schema, modules);
-    const { code } = await startSession(t);
-    const [aiden] = await seedThree(t, code);
+    const { admin, sessionId, code } = await startSession(t);
+    const [aiden, , hesham] = await seedThree(t, code);
+
+    // The list follows the admin's order, not the order people scanned in.
+    const signups = (await admin.query(api.present.activeSession, {}))!.signups;
+    await admin.mutation(api.present.reorder, {
+      sessionId,
+      orderedIds: [hesham, ...signups.map((s) => s._id).filter((id) => id !== hesham)],
+    });
 
     const place = await t.query(api.present.myPlace, { code, signupId: aiden });
 
-    expect(JSON.stringify(place)).not.toContain("Janelle");
-    expect(JSON.stringify(place)).not.toContain("Hesham");
+    expect(place!.roster).toEqual([
+      { name: "Hesham", number: 1, isYou: false },
+      { name: "Aiden", number: 2, isYou: true },
+      { name: "Janelle", number: 3, isYou: false },
+    ]);
+  });
+
+  it("names whose turn it is, and nobody once the last one is done", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId, code } = await startSession(t);
+    const [aiden, janelle] = await seedThree(t, code);
+    await admin.mutation(api.present.setStatus, { sessionId, status: "locked" });
+
+    const currentFor = async (id: string) =>
+      (await t.query(api.present.myPlace, { code, signupId: id }))!.currentNumber;
+
+    // Everyone sees the same figure, whoever is asking.
+    expect(await currentFor(aiden)).toBe(1);
+    expect(await currentFor(janelle)).toBe(1);
+
+    await admin.mutation(api.present.setCurrentIndex, { sessionId, index: 2 });
+    expect(await currentFor(aiden)).toBe(3);
+
+    // The pointer is left one past the end when the last presenter is removed,
+    // which means nobody is up rather than that the first person is.
+    const last = (await admin.query(api.present.activeSession, {}))!.signups[2];
+    await admin.mutation(api.present.removeSignup, { id: last._id });
+    expect(await currentFor(aiden)).toBeNull();
   });
 
   it("reports presenting, next and waiting against the running order", async () => {

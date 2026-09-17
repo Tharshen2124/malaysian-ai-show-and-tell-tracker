@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 /**
  * Short beeps from an oscillator — no audio library, no asset files.
@@ -12,6 +12,16 @@ import { useCallback, useRef } from "react";
  */
 export function useChime() {
   const audioRef = useRef<AudioContext | null>(null);
+
+  // The presenter timer remounts for every new person on stage. Release each
+  // context as it goes, rather than piling one up per talk over an evening.
+  useEffect(() => {
+    const audio = audioRef;
+    return () => {
+      void audio.current?.close();
+      audio.current = null;
+    };
+  }, []);
 
   const ensureAudio = useCallback(() => {
     if (!audioRef.current) {

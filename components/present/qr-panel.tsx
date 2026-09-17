@@ -27,6 +27,9 @@ export function QrPanel({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
 
   const joinUrl = origin ? `${origin}/join/${code}` : null;
+  // Shown without the scheme: it is read off a projector and typed into a phone,
+  // and every phone browser fills in https:// on its own.
+  const enterCodeAt = origin ? `${origin.replace(/^https?:\/\//, "")}/join` : null;
 
   const copy = async () => {
     if (!joinUrl) return;
@@ -61,7 +64,9 @@ export function QrPanel({ code }: { code: string }) {
         </div>
 
         <div className="mt-5 text-center">
-          <p className="kicker">Or enter the code</p>
+          <p className="kicker">Too far to scan? Go to</p>
+          <p className="mt-1 text-lg font-bold break-all text-heading">{enterCodeAt ?? "…"}</p>
+          <p className="kicker mt-3">and enter the code</p>
           {/* Atkinson Hyperlegible is built to keep look-alike characters apart,
               which is exactly the job of a code read off a projector. */}
           <p className="mt-1 text-4xl font-bold tracking-[0.2em] text-heading tabular-nums">{code}</p>
