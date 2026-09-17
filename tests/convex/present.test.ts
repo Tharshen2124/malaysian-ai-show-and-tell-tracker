@@ -217,25 +217,151 @@ describe("present.reorder", () => {
     );
   });
 
-  it("refuses to move anyone who has presented or is presenting", async () => {
+  it("never lets someone who has already presented be pulled back in", async () => {
     const t = convexTest(schema, modules);
     const { admin, sessionId, ids } = await midSession(t);
     const [aiden, janelle, hesham, latecomer] = ids;
 
-    // Aiden, already done, pulled back in behind Janelle.
-    await expect(
+    // Aiden, already done, dragged back in behind Janelle — with the clock
+    // stopped, and again with it running. Neither may give him a second turn.
+    const pullAidenBack = () =>
       admin.mutation(api.present.reorder, {
         sessionId,
         orderedIds: [janelle, aiden, hesham, latecomer],
-      }),
-    ).rejects.toThrow("Only people still waiting can be moved");
-    // Janelle, on stage, pushed down the queue.
+      });
+
+    await expect(pullAidenBack()).rejects.toThrow("Only people who haven't presented can be moved");
+
+    await admin.mutation(api.present.markCurrentStarted, { sessionId });
+    await expect(pullAidenBack()).rejects.toThrow("Only people still waiting can be moved");
+  });
+
+  it("lets the admin change who goes first while the clock is still stopped", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId, code, ids } = await midSession(t);
+    const [aiden, janelle, hesham, latecomer] = ids;
+
+    // Janelle is up but has not begun, so she and Hesham can still swap.
+    await admin.mutation(api.present.reorder, {
+      sessionId,
+      orderedIds: [aiden, hesham, janelle, latecomer],
+    });
+
+    expect(await namesInOrder(admin)).toEqual(["Aiden", "Hesham", "Janelle", "Latecomer"]);
+    // The stage belongs to the index, so Hesham has inherited it — and both
+    // phones are told, without the admin touching the turn pointer.
+    const stateOf = async (id: string) =>
+      (await t.query(api.present.myPlace, { code, signupId: id }))!.state;
+    expect(await stateOf(hesham)).toBe("presenting");
+    expect(await stateOf(janelle)).toBe("next");
+  });
+
+  it("pins the presenter the moment their clock is started", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId, ids } = await midSession(t);
+    const [aiden, janelle, hesham, latecomer] = ids;
+
+    await admin.mutation(api.present.markCurrentStarted, { sessionId });
+
+    // Janelle, now mid-talk, pushed down the queue.
     await expect(
       admin.mutation(api.present.reorder, {
         sessionId,
         orderedIds: [aiden, hesham, janelle, latecomer],
       }),
     ).rejects.toThrow("Only people still waiting can be moved");
+
+    // The queue behind her is still free to move.
+    await admin.mutation(api.present.reorder, {
+      sessionId,
+      orderedIds: [aiden, janelle, latecomer, hesham],
+    });
+    expect(await namesInOrder(admin)).toEqual(["Aiden", "Janelle", "Latecomer", "Hesham"]);
+  });
+});
+
+describe("present.markCurrentStarted", () => {
+  /** Four people, talks under way, Janelle (index 1) on stage. */
+  async function midSession(t: ReturnType<typeof convexTest>) {
+    const started = await startSession(t);
+    const { admin, sessionId, code } = started;
+    const ids = [];
+    for (const name of ["Aiden", "Janelle", "Hesham", "Latecomer"]) {
+      ids.push(await t.mutation(api.present.join, { code, name }));
+    }
+    await admin.mutation(api.present.setStatus, { sessionId, status: "locked" });
+    await admin.mutation(api.present.setCurrentIndex, { sessionId, index: 1 });
+    return { ...started, ids };
+  }
+
+  const startedAt = async (admin: Identity) =>
+    (await admin.query(api.present.activeSession, {}))!.currentStartedAt;
+
+  it("records the slot once and leaves it alone on a second call", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId } = await midSession(t);
+
+    await admin.mutation(api.present.markCurrentStarted, { sessionId });
+    const first = await startedAt(admin);
+    expect(first).toBeTypeOf("number");
+
+    // Pausing and resuming must not re-stamp a slot already under way.
+    await admin.mutation(api.present.markCurrentStarted, { sessionId });
+    expect(await startedAt(admin)).toBe(first);
+  });
+
+  it("is cleared when the turn moves on, so the next person is movable again", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId, ids } = await midSession(t);
+    const [aiden, janelle, hesham, latecomer] = ids;
+    await admin.mutation(api.present.markCurrentStarted, { sessionId });
+
+    await admin.mutation(api.present.setCurrentIndex, { sessionId, index: 2 });
+
+    expect(await startedAt(admin)).toBeUndefined();
+    // Hesham is up but has not begun, so Latecomer can still be sent ahead.
+    await admin.mutation(api.present.reorder, {
+      sessionId,
+      orderedIds: [aiden, janelle, latecomer, hesham],
+    });
+    expect(await namesInOrder(admin)).toEqual(["Aiden", "Janelle", "Latecomer", "Hesham"]);
+  });
+
+  it("is cleared when the presenter is removed and the next person steps up", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId, ids } = await midSession(t);
+    const [, janelle] = ids;
+    await admin.mutation(api.present.markCurrentStarted, { sessionId });
+
+    await admin.mutation(api.present.removeSignup, { id: janelle });
+
+    // Hesham has been pushed onto the stage mid-way through someone else's
+    // slot; his own has not started.
+    expect(await startedAt(admin)).toBeUndefined();
+  });
+
+  it("survives a removal above the presenter, who is still mid-talk", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId, ids } = await midSession(t);
+    const [aiden] = ids;
+    await admin.mutation(api.present.markCurrentStarted, { sessionId });
+
+    await admin.mutation(api.present.removeSignup, { id: aiden });
+
+    expect(await startedAt(admin)).toBeTypeOf("number");
+  });
+
+  it("is dropped when the order is reopened, and rejects a non-admin", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, member, sessionId } = await midSession(t);
+    await admin.mutation(api.present.markCurrentStarted, { sessionId });
+
+    await expect(
+      member.mutation(api.present.markCurrentStarted, { sessionId }),
+    ).rejects.toThrow("Admin access required");
+
+    await admin.mutation(api.present.setStatus, { sessionId, status: "collecting" });
+    expect(await startedAt(admin)).toBeUndefined();
   });
 });
 

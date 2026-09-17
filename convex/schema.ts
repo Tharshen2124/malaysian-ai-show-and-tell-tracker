@@ -79,6 +79,10 @@ export default defineSchema({
     // attendee's phone can tell them they are next; the clock itself stays
     // local to the admin's browser. Absent until the order is locked.
     currentIndex: v.optional(v.number()),
+    // When the admin first started the clock on the current slot. Absent means
+    // the person at `currentIndex` is up but has not begun, which is what lets
+    // `present.reorder` still move them. Cleared whenever the turn pointer moves.
+    currentStartedAt: v.optional(v.number()),
     updatedAt: v.number(),
   })
     .index("by_code", ["code"])

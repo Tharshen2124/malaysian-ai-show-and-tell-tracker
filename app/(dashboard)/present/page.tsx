@@ -26,6 +26,7 @@ export default function PresentPage() {
   const removeSignup = useMutation(api.present.removeSignup);
   const setStatus = useMutation(api.present.setStatus);
   const setCurrentIndex = useMutation(api.present.setCurrentIndex);
+  const markCurrentStarted = useMutation(api.present.markCurrentStarted);
   const updateDurations = useMutation(api.present.updateDurations);
 
   // Dragging a row must move it now, not after a round trip, or it snaps back
@@ -104,6 +105,9 @@ export default function PresentPage() {
   // so everyone has had a turn and the next person to scan in goes straight up.
   const currentIndex = Math.min(Math.max(session.currentIndex ?? 0, 0), session.signups.length);
   const presenterId = session.signups[currentIndex]?._id ?? "nobody";
+  // Until the clock is set going, whoever is up is still just the next name on
+  // the list, and the roster will let them be moved.
+  const currentStarted = session.currentStartedAt !== undefined;
 
   const beginTalks = async () => {
     try {
@@ -140,6 +144,15 @@ export default function PresentPage() {
                   toast.error("Could not move to the next presenter.");
                 }
               }}
+              started={currentStarted}
+              onStart={async () => {
+                try {
+                  await markCurrentStarted({ sessionId: session._id });
+                } catch {
+                  // The clock is running locally either way; all this misses is
+                  // pinning the presenter against a reorder.
+                }
+              }}
               presentationMinutes={session.presentationMinutes}
               feedbackMinutes={session.feedbackMinutes}
               onReopen={async () => {
@@ -163,6 +176,7 @@ export default function PresentPage() {
           <RosterList
             signups={session.signups}
             currentIndex={presenting ? currentIndex : undefined}
+            currentStarted={currentStarted}
             onReorder={async (orderedIds: Id<"presentSignups">[]) => {
               try {
                 await reorder({ sessionId: session._id, orderedIds });

@@ -8,12 +8,12 @@ export const summary = query({
   handler: async (ctx) => {
     await requireMember(ctx);
 
-    const meetupsPage = await listMeetupsInner(ctx, { page: 1, pageSize: 4 });
+    const meetupsPage = await listMeetupsInner(ctx, { page: 1, pageSize: 3 });
     const membersPage = await listMembersInner(ctx, {
       isActive: true,
       sortBy: "recent_talks",
       page: 1,
-      pageSize: 8,
+      pageSize: 3,
     });
 
     const [allMembers, allMeetups, allProjects, allUpdates] = await Promise.all([

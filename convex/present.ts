@@ -152,14 +152,21 @@ export const reorder = mutation({
       if (!seen.has(row._id)) throw new Error("Order is out of date — refresh and try again");
     }
 
-    // Mid-session, only the queue behind the current talk may move. Shuffling
-    // someone who has presented back into it would give them a second turn, and
-    // moving the person on stage would swap names under a running clock.
+    // Mid-session, anyone who has already presented is pinned: shuffling them
+    // back into the queue would give them a second turn. The person on stage is
+    // pinned too, but only once their clock has been started — swapping names
+    // under a running clock is the thing to prevent, and before that the slot
+    // has not really begun, so the admin may still change who goes first.
     if (session.status === "locked") {
-      const frozen = Math.min((session.currentIndex ?? 0) + 1, existing.length);
+      const started = session.currentStartedAt !== undefined;
+      const frozen = Math.min((session.currentIndex ?? 0) + (started ? 1 : 0), existing.length);
       for (let i = 0; i < frozen; i++) {
         if (orderedIds[i] !== existing[i]._id) {
-          throw new Error("Only people still waiting can be moved");
+          throw new Error(
+            started
+              ? "Only people still waiting can be moved"
+              : "Only people who haven't presented can be moved",
+          );
         }
       }
     }
@@ -194,15 +201,22 @@ export const removeSignup = mutation({
     // next person steps up, or — if they were last — it sits one past the end,
     // which reads as everyone done until a latecomer scans in.
     const session = await ctx.db.get(row.sessionId);
-    if (
-      session?.status === "locked" &&
-      session.currentIndex !== undefined &&
-      removedIndex < session.currentIndex
-    ) {
-      await ctx.db.patch(session._id, {
-        currentIndex: session.currentIndex - 1,
-        updatedAt: Date.now(),
-      });
+    if (session?.status === "locked" && session.currentIndex !== undefined) {
+      if (removedIndex < session.currentIndex) {
+        // The same person is still on stage, one row higher up. Their clock, if
+        // it is running, goes on running.
+        await ctx.db.patch(session._id, {
+          currentIndex: session.currentIndex - 1,
+          updatedAt: Date.now(),
+        });
+      } else if (removedIndex === session.currentIndex) {
+        // Whoever was next has just been pushed onto the stage, so the slot
+        // begins again: unstarted, and reorderable until the clock is set going.
+        await ctx.db.patch(session._id, {
+          currentStartedAt: undefined,
+          updatedAt: Date.now(),
+        });
+      }
     }
     return null;
   },
@@ -214,10 +228,12 @@ export const setStatus = mutation({
     await requireAdmin(ctx);
     await requireSession(ctx, sessionId);
     // Locking starts the running order at the top; reopening drops the pointer
-    // so a stale turn cannot be shown against a roster being rearranged.
+    // so a stale turn cannot be shown against a roster being rearranged. Either
+    // way the clock has not been started on whoever ends up at the top.
     await ctx.db.patch(sessionId, {
       status,
       currentIndex: status === "locked" ? 0 : undefined,
+      currentStartedAt: undefined,
       updatedAt: Date.now(),
     });
     return null;
@@ -234,7 +250,35 @@ export const setCurrentIndex = mutation({
       throw new Error("No such presenter");
     }
     if (session.status !== "locked") throw new Error("The order is not locked yet");
-    await ctx.db.patch(sessionId, { currentIndex: index, updatedAt: Date.now() });
+    // Whoever steps up gets an unstarted slot, so they can still be reordered
+    // until the admin actually sets the clock going.
+    await ctx.db.patch(sessionId, {
+      currentIndex: index,
+      currentStartedAt: undefined,
+      updatedAt: Date.now(),
+    });
+    return null;
+  },
+});
+
+/**
+ * The admin set the clock going on the current slot. Until this lands, the
+ * person on stage is still just the next name on the list and `reorder` will
+ * move them; afterwards they are pinned for the rest of their turn.
+ *
+ * Idempotent, and deliberately one-way: pausing, resetting or granting an extra
+ * minute all leave the slot under way. Only the turn pointer moving clears it.
+ */
+export const markCurrentStarted = mutation({
+  args: { sessionId: v.id("presentSessions") },
+  handler: async (ctx, { sessionId }) => {
+    await requireAdmin(ctx);
+    const session = await requireSession(ctx, sessionId);
+    // Nothing to record against a session that is no longer running talks — and
+    // a second admin reopening setup at that moment is not worth an error.
+    if (session.status !== "locked") return null;
+    if (session.currentStartedAt !== undefined) return null;
+    await ctx.db.patch(sessionId, { currentStartedAt: Date.now(), updatedAt: Date.now() });
     return null;
   },
 });

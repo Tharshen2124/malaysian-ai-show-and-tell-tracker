@@ -31,11 +31,9 @@ export function AdminControlPanel() {
           <button
             key={key}
             onClick={() => setOpenModal(key)}
-            className="card-surface flex items-center gap-3 px-5 py-4 text-left transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-line"
+            className="card-surface flex items-center gap-3 px-5 py-5 text-left transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-line"
           >
-            <span className="rounded-button bg-button p-2.5 text-on-button">
-              <Icon className="h-5 w-5" />
-            </span>
+            <Icon className="h-5 w-5 shrink-0 text-accent" />
             <span>{label}</span>
           </button>
         ))}

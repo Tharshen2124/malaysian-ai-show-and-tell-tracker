@@ -23,6 +23,14 @@ interface PresenterTimerProps {
    */
   currentIndex: number;
   onAdvance: (index: number) => void;
+  /** Whether the clock has already been set going for this slot. */
+  started: boolean;
+  /**
+   * Report that the slot is under way. This is what pins the person on stage
+   * against `present.reorder`, so it goes to the server even though the clock
+   * itself stays local to this browser.
+   */
+  onStart: () => void;
   presentationMinutes: number;
   feedbackMinutes: number;
   /** Stop the talks and go back to setting the order and timings. */
@@ -34,6 +42,8 @@ export function PresenterTimer({
   order,
   currentIndex: current,
   onAdvance,
+  started,
+  onStart,
   presentationMinutes,
   feedbackMinutes,
   onReopen,
@@ -45,6 +55,12 @@ export function PresenterTimer({
 
   const isLast = current >= order.length - 1;
   const presenter = order[current];
+
+  // Sent once per presenter: pausing and resuming is still the same slot, and
+  // the mutation is idempotent anyway.
+  const markStarted = () => {
+    if (!started) onStart();
+  };
 
   const nextPresenter = () => {
     // Advancing is what tells the next person's phone to buzz, so it goes to the
@@ -135,7 +151,14 @@ export function PresenterTimer({
         )}
 
         <div className="flex flex-wrap justify-center gap-2">
-          <button onClick={timer.toggle} className={buttonClass("primary")}>
+          <button
+            onClick={() => {
+              // Starting, not pausing, is what commits the running order.
+              if (!timer.running) markStarted();
+              timer.toggle();
+            }}
+            className={buttonClass("primary")}
+          >
             {timer.running ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
             {timer.running ? "Pause" : "Start"}
           </button>
@@ -143,7 +166,11 @@ export function PresenterTimer({
             <Plus className="h-4 w-4" />1 minute
           </button>
           <button
-            onClick={timer.skipToFeedback}
+            onClick={() => {
+              // Jumping straight to feedback still means the slot has begun.
+              markStarted();
+              timer.skipToFeedback();
+            }}
             disabled={feedback}
             className={buttonClass("outline")}
             title="Jump to the feedback window without waiting out the clock"

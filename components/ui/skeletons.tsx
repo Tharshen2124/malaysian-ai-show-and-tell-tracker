@@ -44,11 +44,12 @@ export function ProjectRowSkeleton() {
   );
 }
 
+/** Matches the dashboard's flat figure strip — no card around the number. */
 export function StatSkeleton() {
   return (
-    <div className="card-surface p-4">
-      <Bone className="h-4 w-16" />
-      <Bone className="mt-3 h-8 w-12" />
+    <div>
+      <Bone className="h-3 w-16" />
+      <Bone className="mt-2 h-7 w-12" />
     </div>
   );
 }
@@ -56,12 +57,15 @@ export function StatSkeleton() {
 export function CardGridSkeleton({
   count,
   kind,
+  className = "grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4",
 }: {
   count: number;
   kind: "member" | "meetup";
+  /** Grid classes, so a caller laying cards out differently keeps them aligned. */
+  className?: string;
 }) {
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div className={className}>
       {Array.from({ length: count }).map((_, i) =>
         kind === "member" ? <MemberCardSkeleton key={i} /> : <MeetupCardSkeleton key={i} />,
       )}

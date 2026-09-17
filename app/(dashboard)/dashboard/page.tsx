@@ -9,6 +9,9 @@ import { MeetupCard } from "@/components/cards/meetup-card";
 import { CardGridSkeleton, StatSkeleton } from "@/components/ui/skeletons";
 import { EmptyState } from "@/components/ui/error-state";
 
+/** Three across, so each section stays one row and the page ends above the fold. */
+const CARD_GRID = "grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3";
+
 function Section({
   title,
   viewAllHref,
@@ -47,21 +50,17 @@ export default function DashboardPage() {
     : null;
 
   return (
-    <div className="space-y-12">
-      <div>
-        <h1 className="page-title">Dashboard</h1>
-        <p className="mt-3 text-sm text-soft">
-          The community at a glance — meetups, projects, and who&apos;s been talking.
-        </p>
-      </div>
+    <div className="flat-cards space-y-10">
+      {/* The page opens on the admin actions; everything below it is reference. */}
+      <AdminControlPanel />
 
-      {/* Stats row */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      {/* Counts read as a plain figure strip — a card per number earned nothing. */}
+      <div className="flex flex-wrap gap-x-10 gap-y-5 border-y border-hairline py-5">
         {stats
           ? stats.map((stat) => (
-              <div key={stat.label} className="card-surface p-4">
+              <div key={stat.label}>
                 <p className="kicker">{stat.label}</p>
-                <p className="display-figure mt-2 text-[2.6rem] leading-none text-heading">
+                <p className="display-figure mt-1 text-[2rem] leading-none text-heading">
                   {stat.value}
                 </p>
               </div>
@@ -69,15 +68,13 @@ export default function DashboardPage() {
           : Array.from({ length: 4 }).map((_, i) => <StatSkeleton key={i} />)}
       </div>
 
-      <AdminControlPanel />
-
       <Section title="Meetups" viewAllHref="/meetups">
         {!summary ? (
-          <CardGridSkeleton count={4} kind="meetup" />
+          <CardGridSkeleton count={3} kind="meetup" className={CARD_GRID} />
         ) : summary.recentMeetups.length === 0 ? (
           <EmptyState message="No meetups recorded yet." />
         ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className={CARD_GRID}>
             {summary.recentMeetups.map((meetup) => (
               <MeetupCard key={meetup._id} meetup={meetup} />
             ))}
@@ -87,11 +84,11 @@ export default function DashboardPage() {
 
       <Section title="Active Members" viewAllHref="/members">
         {!summary ? (
-          <CardGridSkeleton count={4} kind="member" />
+          <CardGridSkeleton count={3} kind="member" className={CARD_GRID} />
         ) : summary.activeMembers.length === 0 ? (
           <EmptyState message="No active members yet." />
         ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className={CARD_GRID}>
             {summary.activeMembers.map((member) => (
               <MemberCard key={member._id} member={member} />
             ))}

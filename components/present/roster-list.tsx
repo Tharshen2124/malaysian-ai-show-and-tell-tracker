@@ -41,18 +41,34 @@ interface RosterListProps {
    * queue behind can be rearranged. Omitted while the order is still being set.
    */
   currentIndex?: number;
+  /**
+   * Whether the clock has been started on the current talk. Until it has, the
+   * person on stage is still just the next name on the list and can be moved —
+   * `present.reorder` applies the same rule server-side.
+   */
+  currentStarted?: boolean;
   onReorder: (orderedIds: Id<"presentSignups">[]) => void;
   onRemove: (id: Id<"presentSignups">) => Promise<void> | void;
 }
 
-export function RosterList({ signups, currentIndex, onReorder, onRemove }: RosterListProps) {
+export function RosterList({
+  signups,
+  currentIndex,
+  currentStarted,
+  onReorder,
+  onRemove,
+}: RosterListProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   // A stray tap on a bin icon would silently wipe someone's place, and their
   // phone with it, so every removal is confirmed.
   const [removing, setRemoving] = useState<{ signup: Signup; index: number } | null>(null);
   const presenting = currentIndex !== undefined;
-  // Rows above this index have presented or are presenting now.
-  const frozen = presenting ? Math.min(currentIndex + 1, signups.length) : 0;
+  // Rows that cannot be moved: everyone who has already presented, plus the
+  // person on stage — but only once their clock is running. Kept in step with
+  // the same rule in `present.reorder`, which is what actually enforces it.
+  const frozen = presenting
+    ? Math.min(currentIndex + (currentStarted ? 1 : 0), signups.length)
+    : 0;
   const waiting = signups.length - frozen;
 
   const move = (from: number, to: number) => {
@@ -107,8 +123,8 @@ export function RosterList({ signups, currentIndex, onReorder, onRemove }: Roste
         <>
           <ol className="space-y-1.5">
             {signups.map((signup, i) => {
+              const now = presenting && i === currentIndex;
               if (i < frozen) {
-                const now = i === currentIndex;
                 return (
                   <li
                     key={signup._id}
@@ -140,13 +156,21 @@ export function RosterList({ signups, currentIndex, onReorder, onRemove }: Roste
                     if (dragIndex !== null) move(dragIndex, i);
                     setDragIndex(null);
                   }}
-                  className={`flex items-center gap-2 rounded-media border-[1.5px] bg-card px-3 py-2 text-sm ${
-                    dragIndex === i ? "border-line opacity-60" : "border-hairline"
+                  className={`flex items-center gap-2 rounded-media border-[1.5px] px-3 py-2 text-sm ${
+                    dragIndex === i
+                      ? "border-line bg-card opacity-60"
+                      : now
+                        ? "border-success-line bg-success-soft text-success"
+                        : "border-hairline bg-card"
                   }`}
                 >
-                  <span className="w-5 text-faint tabular-nums">{i + 1}.</span>
-                  <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-faint" />
+                  <span className={`w-5 tabular-nums ${now ? "" : "text-faint"}`}>{i + 1}.</span>
+                  <GripVertical
+                    className={`h-4 w-4 shrink-0 cursor-grab ${now ? "" : "text-faint"}`}
+                  />
+                  {now && <Mic className="h-4 w-4 shrink-0" />}
                   <span className="min-w-0 flex-1 truncate">{signup.name}</span>
+                  {now && <span className="kicker shrink-0">Now</span>}
                   {/* Keyboard-reachable equivalent of dragging. */}
                   <span className="flex shrink-0 items-center gap-0.5">
                     <button
@@ -172,9 +196,11 @@ export function RosterList({ signups, currentIndex, onReorder, onRemove }: Roste
             })}
           </ol>
           <p className="text-xs text-faint">
-            {presenting
-              ? "Drag rows, or use ↑ ↓, to change who's up next. Latecomers who scan in join the bottom."
-              : "Drag rows, or use ↑ ↓, to set the order."}
+            {!presenting
+              ? "Drag rows, or use ↑ ↓, to set the order."
+              : currentStarted
+                ? "Drag rows, or use ↑ ↓, to change who's up next. Latecomers who scan in join the bottom."
+                : "The clock hasn't started, so you can still change who goes first. Latecomers who scan in join the bottom."}
           </p>
         </>
       )}

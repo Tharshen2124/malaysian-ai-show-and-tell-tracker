@@ -242,6 +242,15 @@
   }
 }
 
+/*
+ * Drops the card fill in dark mode only — on ink navy the hairline alone is
+ * enough of an edge, and the page reads quieter. Scoped to whatever carries the
+ * class, since `card-surface` and `field-input` both read --card-background.
+ */
+@utility flat-cards {
+  --card-background: light-dark(#fffaf2, transparent);
+}
+
 /* Structural surface: flat, separated by a hairline, never a resting shadow. */
 @utility card-surface {
   background-color: var(--card-background);
