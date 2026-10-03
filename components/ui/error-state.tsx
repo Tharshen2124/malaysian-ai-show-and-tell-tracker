@@ -1,8 +1,8 @@
 import { CloudOff } from "lucide-react";
 
 /**
- * Dashboard states, in shadcn's idiom. The Malaysian AI originals live in
- * error-state-legacy.tsx and are still what app/join renders.
+ * Dashboard and attendee states, in shadcn's idiom. The Malaysian AI
+ * originals live in error-state-legacy.tsx.
  */
 export function ErrorState({
   message = "Something went wrong loading this view.",
@@ -19,7 +19,10 @@ export function ErrorState({
 
 export function InlineErrorBanner({ message }: { message: string }) {
   return (
-    <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+    <div
+      role="alert"
+      className="rounded-lg border border-danger-line bg-danger-soft px-3.5 py-2.5 text-sm text-danger"
+    >
       {message}
     </div>
   );
