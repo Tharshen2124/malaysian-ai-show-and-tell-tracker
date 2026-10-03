@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
   Check,
+  ChevronDown,
   GripVertical,
   Mic,
   Shuffle,
@@ -30,6 +31,21 @@ export interface Signup {
  *  the touch-sized buttons leave too little room to read a name cut short. */
 const NAME_CLASS =
   "min-w-0 flex-1 truncate max-sm:whitespace-normal max-sm:[overflow-wrap:anywhere] max-sm:py-2";
+
+/** Past this many names the list scrolls in place, so it does not push the
+ *  controls below it (Start presentations) off the bottom of the screen. */
+const VISIBLE_ROWS = 6;
+
+/** How far the list fades out at an edge that has more rows past it. */
+const FADE_PX = 36;
+
+/** Fades whichever edges have rows hidden past them — the cue that the list
+ *  scrolls, since a Mac hides its scrollbar until something is already moving. */
+function edgeFade(above: boolean, below: boolean): React.CSSProperties | undefined {
+  if (!above && !below) return undefined;
+  const mask = `linear-gradient(to bottom, ${above ? "transparent" : "black"} 0, black ${FADE_PX}px, black calc(100% - ${FADE_PX}px), ${below ? "transparent" : "black"} 100%)`;
+  return { maskImage: mask, WebkitMaskImage: mask };
+}
 
 /** Fisher–Yates: every permutation equally likely, unlike sort(() => rand). */
 function shuffle<T>(items: T[]): T[] {
@@ -94,6 +110,54 @@ export function RosterList({
   // the same rule in `present.reorder`, which is what actually enforces it.
   const frozen = presenting ? Math.min(currentIndex + (currentStarted ? 1 : 0), signups.length) : 0;
   const waiting = signups.length - frozen;
+  const scrolls = signups.length > VISIBLE_ROWS;
+  const listRef = useRef<HTMLOListElement>(null);
+  // What is out of sight: whether anything has scrolled off the top, and how
+  // many rows are still (even partly) hidden below.
+  const [hidden, setHidden] = useState({ above: false, below: 0 });
+
+  const readHidden = () => {
+    const list = listRef.current;
+    if (!list) return;
+    const bottom = list.scrollTop + list.clientHeight;
+    let below = 0;
+    for (const row of Array.from(list.children) as HTMLElement[]) {
+      if (row.offsetTop + row.offsetHeight > bottom + 1) below++;
+    }
+    const above = list.scrollTop > 1;
+    setHidden((prev) => (prev.above === above && prev.below === below ? prev : { above, below }));
+  };
+
+  // Cap the list at VISIBLE_ROWS rows and half of the next, so the row cut off
+  // at the bottom shows there is more. Measured rather than guessed, because a
+  // long name wraps on a phone and makes its row taller; re-measured whenever
+  // the list resizes for the same reason.
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    if (!scrolls) {
+      list.style.maxHeight = "";
+      return;
+    }
+    const measure = () => {
+      const peek = list.children[VISIBLE_ROWS] as HTMLElement | undefined;
+      if (peek) list.style.maxHeight = `${peek.offsetTop + peek.offsetHeight / 2}px`;
+      readHidden();
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, [scrolls, signups]);
+
+  // Keep whoever is on stage at the top of the scrolled list, with the queue
+  // behind them in view.
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list || !scrolls || currentIndex === undefined) return;
+    const row = list.children[currentIndex] as HTMLElement | undefined;
+    if (row) list.scrollTo({ top: row.offsetTop, behavior: "smooth" });
+  }, [scrolls, currentIndex]);
 
   const move = (from: number, to: number) => {
     if (from < frozen || to < frozen || to >= signups.length || from === to) return;
@@ -152,7 +216,13 @@ export function RosterList({
         </div>
       ) : (
         <>
-          <ol className="space-y-1.5">
+          {/* `relative` makes the rows' offsetTop measure from the list itself. */}
+          <ol
+            ref={listRef}
+            onScroll={scrolls ? readHidden : undefined}
+            style={scrolls ? edgeFade(hidden.above, hidden.below > 0) : undefined}
+            className={`relative space-y-1.5 ${scrolls ? "overflow-y-auto overscroll-contain pr-1.5" : ""}`}
+          >
             {signups.map((signup, i) => {
               const now = presenting && i === currentIndex;
               if (i < frozen) {
@@ -242,6 +312,26 @@ export function RosterList({
               );
             })}
           </ol>
+          {/* Hidden rather than removed at the bottom of the list, so its space
+              stays put and nothing underneath jumps as the list scrolls. */}
+          {scrolls && (
+            <button
+              type="button"
+              onClick={() => {
+                const list = listRef.current;
+                list?.scrollBy({ top: list.clientHeight - FADE_PX, behavior: "smooth" });
+              }}
+              disabled={hidden.below === 0}
+              aria-hidden={hidden.below === 0}
+              tabIndex={hidden.below === 0 ? -1 : undefined}
+              className={`mx-auto -mt-1 flex items-center gap-1 rounded-full px-3 py-1 text-xs text-muted-foreground tabular-nums transition-colors hover:text-foreground max-sm:min-h-11 ${
+                hidden.below === 0 ? "invisible" : ""
+              }`}
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+              {hidden.below} more below
+            </button>
+          )}
           <p className="text-xs text-muted-foreground">
             {!presenting ? (
               <>
