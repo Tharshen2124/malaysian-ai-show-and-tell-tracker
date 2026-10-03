@@ -61,9 +61,15 @@ export function MemberCard({ member }: { member: MemberListItem }) {
         onClick={() => setOpen(true)}
         className="rounded-xl border bg-card text-card-foreground shadow-sm w-full p-4 text-left transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-border-hover"
       >
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="text-base font-semibold">{member.name}</h3>
-          <StatusPill isActive={member.isActive} />
+        {/* One line, so every card's metrics start at the same height. The full
+            name is in the tooltip and the detail modal. */}
+        <div className="flex items-center justify-between gap-2">
+          <h3 title={member.name} className="min-w-0 truncate text-base font-semibold">
+            {member.name}
+          </h3>
+          <span className="shrink-0">
+            <StatusPill isActive={member.isActive} />
+          </span>
         </div>
         <div className="mt-4 space-y-2">
           <Metric icon={Folder} label="Projects" value={member.projectCount} />
