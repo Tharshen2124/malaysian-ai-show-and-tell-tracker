@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, Hourglass, Mic, Sparkles } from "lucide-react";
 import { useChime } from "@/lib/use-chime";
+import { AttendeeClock, SlotClock } from "./attendee-clock";
 import { AlertKind, PlaceAlert } from "./place-alert";
 
 export type PlaceState = "waiting" | "next" | "presenting" | "done";
@@ -26,6 +27,8 @@ export interface Place {
   roster: RosterEntry[];
   /** The session's own state: once it is "done", so is everyone on the list. */
   status: "collecting" | "locked" | "done";
+  /** The clock on whoever is up, or null when nobody is on stage. */
+  clock: SlotClock | null;
 }
 
 /** Two rising tones for "you're next", three for "you're up". */
@@ -75,9 +78,19 @@ export function AttendeePlace({ place }: { place: Place }) {
     return () => clearTimeout(timer);
   }, [alert]);
 
+  const presenter = place.currentNumber !== null ? place.roster[place.currentNumber - 1] : null;
+
   return (
     <div className="space-y-5">
       <StatusCard place={place} />
+
+      {place.clock && presenter && (
+        <AttendeeClock
+          clock={place.clock}
+          presenterName={presenter.name}
+          isYou={place.state === "presenting"}
+        />
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <NumberTile label="Current presenter" value={place.currentNumber} />

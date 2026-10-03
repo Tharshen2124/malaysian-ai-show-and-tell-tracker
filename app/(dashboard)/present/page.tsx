@@ -10,6 +10,7 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { minutesToSeconds, secondsToMinutes } from "@/lib/clock";
 import { useAccess } from "@/lib/use-access";
+import { serverNow } from "@/lib/use-server-offset";
 import { useToast } from "@/components/providers/toast-provider";
 import { ClockField } from "@/components/present/clock-field";
 import { QrPanel } from "@/components/present/qr-panel";
@@ -25,9 +26,11 @@ const DEFAULT_FEEDBACK_MINUTES = 2;
  * Start, pause and reset answer a tap on a clock the whole room is watching, so
  * they move it before the round trip rather than after it. The server's own
  * timestamps land a moment later and win — within the latency of one mutation,
- * so the figure does not visibly jump. Each mirrors its mutation in
- * `convex/present.ts`, including declining to restart a clock that is already
- * running, so the two cannot disagree while the write is in flight.
+ * so the figure does not visibly jump. The guesses are stamped on server time
+ * (`serverNow`), so a device whose own clock is off does not make that jump any
+ * bigger. Each mirrors its mutation in `convex/present.ts`, including declining
+ * to restart a clock that is already running, so the two cannot disagree while
+ * the write is in flight.
  *
  * Granting a minute and skipping to feedback are deliberately left to the
  * server: both turn on which phase is running, and that is a judgement only one
@@ -48,7 +51,7 @@ type ActiveSession = FunctionReturnType<typeof api.present.activeSession>;
 const startedClock = (localStore: OptimisticLocalStore) =>
   patchSession(localStore, (session) => {
     if (session.clockStartedAt !== undefined) return null;
-    const now = Date.now();
+    const now = serverNow();
     return {
       clockStartedAt: now - (session.clockElapsedMs ?? 0),
       // Starting the clock is also what pins the presenter against a reorder.
@@ -62,7 +65,7 @@ const pausedClock = (localStore: OptimisticLocalStore) =>
       ? null
       : {
           clockStartedAt: undefined,
-          clockElapsedMs: Math.max(0, Date.now() - session.clockStartedAt),
+          clockElapsedMs: Math.max(0, serverNow() - session.clockStartedAt),
         },
   );
 

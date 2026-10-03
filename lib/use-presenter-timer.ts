@@ -4,14 +4,15 @@ import { useEffect, useRef } from "react";
 import { minutesToMs } from "./clock";
 import { useChime } from "./use-chime";
 import { useNow } from "./use-now";
+import { useServerOffset } from "./use-server-offset";
 
 /** A slot is one talk followed by its feedback; each gets its own countdown. */
 export type TimerPhase = "presentation" | "feedback";
 
 /**
- * The clock as the session row describes it. Every admin device gets the same
- * four figures, which is what keeps the phone in the organiser's hand and the
- * laptop on the projector showing the same time.
+ * The clock as the session row describes it. Every device gets the same four
+ * figures — the laptop on the projector, the phone in the organiser's hand, and
+ * the attendees' phones — which is what keeps them all showing the same time.
  */
 export interface SharedClock {
   /** Back-dated start instant; absent means paused. See `convex/schema.ts`. */
@@ -45,10 +46,9 @@ export interface PresenterTimer {
  * comes back. The phase boundary is derived from the same figure, so the clock
  * and the phase can never disagree.
  *
- * Devices read their own wall clock against a server timestamp, so a device
- * whose clock is minutes out shows a time that is minutes out. Phones and
- * laptops keep themselves within a second or so of real time, which is well
- * inside what a presentation clock needs.
+ * The instants on the session are the server's, so each device reads them on
+ * server time too (`useServerOffset`): a phone whose clock runs a few seconds
+ * fast still shows the same figure as the projector.
  */
 export function usePresenterTimer(
   presentationMinutes: number,
@@ -64,7 +64,7 @@ export function usePresenterTimer(
 
   // What the last tick read off the wall clock. Only ticks while running; a
   // paused clock reads the figure the pause banked instead.
-  const now = useNow(running);
+  const now = useNow(running) + useServerOffset();
 
   const elapsedMs = running ? Math.max(0, now - clockStartedAt) : (clockElapsedMs ?? 0);
 

@@ -559,6 +559,21 @@ export const myPlace = query({
     // means nobody is on stage rather than that the first person is.
     const currentNumber = current !== null && current < signups.length ? current + 1 : null;
 
+    // The slot clock, exactly as the admin devices read it, so the person on
+    // stage — and everyone waiting — sees the same figure as the projector.
+    // Only while somebody is actually up; otherwise there is no slot to time.
+    const clock =
+      currentNumber !== null
+        ? {
+            presentationMinutes: session.presentationMinutes,
+            feedbackMinutes: session.feedbackMinutes,
+            clockStartedAt: session.clockStartedAt,
+            clockElapsedMs: session.clockElapsedMs,
+            bonusPresentationMs: session.bonusPresentationMs,
+            bonusFeedbackMs: session.bonusFeedbackMs,
+          }
+        : null;
+
     // The running order, as it reads on the screen at the front of the room.
     // These names are already on the projector in front of everyone, and a phone
     // that cannot see the list has no way to judge how close its turn is. Holding
@@ -578,6 +593,21 @@ export const myPlace = query({
       status: session.status,
       currentNumber,
       roster,
+      clock,
     };
   },
+});
+
+/**
+ * The server's wall clock, for a device to measure how far its own is out.
+ *
+ * Every clock instant on the session is stamped here, so a phone whose clock
+ * runs a few seconds fast would otherwise show a few seconds less on the clock
+ * than the projector does. A mutation rather than a query on purpose: a query
+ * result is cached and could hand back a time that is already stale. Reads and
+ * writes nothing, so it is safe to leave open to anonymous callers.
+ */
+export const serverTime = mutation({
+  args: {},
+  handler: async () => Date.now(),
 });
