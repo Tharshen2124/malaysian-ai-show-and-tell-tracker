@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, Hourglass, Mic, Sparkles } from "lucide-react";
 import { useChime } from "@/lib/use-chime";
+import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { AttendeeClock, SlotClock } from "./attendee-clock";
 import { AlertKind, PlaceAlert } from "./place-alert";
 
 export type PlaceState = "waiting" | "next" | "presenting" | "done";
@@ -26,6 +29,8 @@ export interface Place {
   roster: RosterEntry[];
   /** The session's own state: once it is "done", so is everyone on the list. */
   status: "collecting" | "locked" | "done";
+  /** The clock on whoever is up, or null when nobody is on stage. */
+  clock: SlotClock | null;
 }
 
 /** Two rising tones for "you're next", three for "you're up". */
@@ -75,9 +80,19 @@ export function AttendeePlace({ place }: { place: Place }) {
     return () => clearTimeout(timer);
   }, [alert]);
 
+  const presenter = place.currentNumber !== null ? place.roster[place.currentNumber - 1] : null;
+
   return (
-    <div className="space-y-5">
+    <div className="grid gap-4">
       <StatusCard place={place} />
+
+      {place.clock && presenter && (
+        <AttendeeClock
+          clock={place.clock}
+          presenterName={presenter.name}
+          isYou={place.state === "presenting"}
+        />
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <NumberTile label="Current presenter" value={place.currentNumber} />
@@ -91,16 +106,22 @@ export function AttendeePlace({ place }: { place: Place }) {
   );
 }
 
+/** platform-design.md's eyebrow: sentence case, 600, muted — not the marketing kicker. */
+const EYEBROW = "text-[0.8125rem] leading-snug font-semibold text-muted-foreground";
+
+/** Big numbers, in the body face so the digits stay tabular. */
+const FIGURE = "font-bold tracking-[-0.02em] tabular-nums";
+
 /** The two figures from the front of the room, kept legible at arm's length. */
 function NumberTile({ label, value }: { label: string; value: number | null }) {
   return (
-    <div className="card-surface flex flex-col items-center justify-center gap-2 px-3 py-5 text-center">
-      <p className="kicker">{label}</p>
-      <p className="display-figure text-[clamp(2.75rem,15vw,3.75rem)] leading-none text-heading">
+    <Card className="items-center justify-center gap-2 px-3 py-5 text-center">
+      <p className={EYEBROW}>{label}</p>
+      <p className={cn(FIGURE, "text-[clamp(2.75rem,15vw,3.75rem)] leading-none")}>
         {/* Padded so the two tiles stay the same width as the order moves on. */}
         {value === null ? "—" : String(value).padStart(2, "0")}
       </p>
-    </div>
+    </Card>
   );
 }
 
@@ -111,14 +132,14 @@ function RunningOrder({ place }: { place: Place }) {
   const finished = status === "done";
 
   return (
-    <section className="card-surface p-4">
-      <h2 className="kicker mb-3">
+    <Card className="gap-3 px-2.5 py-4">
+      <h2 className="flex items-baseline gap-2 px-2.5 text-[1.0625rem]">
         The order
-        <span className="ml-2 tracking-normal normal-case tabular-nums">
-          ({roster.length} {roster.length === 1 ? "person" : "people"})
+        <span className="text-[0.8125rem] font-normal text-muted-foreground tabular-nums">
+          {roster.length} {roster.length === 1 ? "person" : "people"}
         </span>
       </h2>
-      <ol className="space-y-2">
+      <ol className="grid gap-0.5">
         {roster.map((row) => {
           const now = !finished && row.number === currentNumber;
           const done = finished || (currentNumber !== null && row.number < currentNumber);
@@ -126,25 +147,36 @@ function RunningOrder({ place }: { place: Place }) {
             <li
               key={row.number}
               aria-current={now ? "true" : undefined}
-              className={`flex gap-2 text-base ${
-                now ? "text-success" : done ? "text-faint" : "text-ink"
-              }`}
+              className={cn(
+                "flex gap-3 rounded-lg px-2.5 py-2 text-[0.9375rem]",
+                // Their own row wears the sidebar's selection pill.
+                row.isYou && "bg-selection",
+                now
+                  ? "font-semibold text-success"
+                  : done
+                    ? "text-muted-foreground/70"
+                    : "text-foreground",
+              )}
             >
-              <span className="w-6 shrink-0 tabular-nums text-faint">{row.number}.</span>
+              <span className="w-6 shrink-0 text-muted-foreground/70 tabular-nums">
+                {row.number}.
+              </span>
               {/* One flow rather than separate columns, so the label sits beside
                   the name and wraps with it instead of hugging the right edge. */}
               <span className="min-w-0 flex-1 break-words">
-                <span className={`${done ? "line-through" : ""} ${row.isYou ? "font-bold" : ""}`}>
+                <span className={cn(done && "line-through", row.isYou && "font-semibold")}>
                   {row.name}
                 </span>
-                {now && <span className="ml-2 text-xs">(presenting now)</span>}
-                {!now && row.isYou && <span className="ml-2 text-xs text-faint">(you)</span>}
+                {now && <span className="ml-2 text-xs font-normal">(presenting now)</span>}
+                {!now && row.isYou && (
+                  <span className="ml-2 text-xs text-muted-foreground">(you)</span>
+                )}
               </span>
             </li>
           );
         })}
       </ol>
-    </section>
+    </Card>
   );
 }
 
@@ -153,17 +185,17 @@ function RunningOrder({ place }: { place: Place }) {
 function StatusCard({ place }: { place: Place }) {
   if (place.state === "presenting") {
     return (
-      <Card tone="accent" icon={<Mic className="h-9 w-9" />} title="You're presenting now!">
+      <StatusPanel tone="accent" icon={<Mic className="size-9" />} title="You're presenting now!">
         <p className="text-sm">You&apos;re on — go for it, {place.name}.</p>
-      </Card>
+      </StatusPanel>
     );
   }
 
   if (place.state === "next") {
     return (
-      <Card tone="warn" icon={<Sparkles className="h-9 w-9" />} title="You're up next!" pulse>
+      <StatusPanel tone="warn" icon={<Sparkles className="size-9" />} title="You're up next!" pulse>
         <p className="text-sm">Head to the front when the current talk wraps up.</p>
-      </Card>
+      </StatusPanel>
     );
   }
 
@@ -171,37 +203,38 @@ function StatusCard({ place }: { place: Place }) {
   // suit someone whose turn never came around.
   if (place.state === "done") {
     return (
-      <Card tone="done" icon={<CheckCircle2 className="h-9 w-9" />} title="You're all done">
+      <StatusPanel tone="done" icon={<CheckCircle2 className="size-9" />} title="You're all done">
         <p className="text-sm">Thanks, {place.name}. Enjoy the rest of the talks.</p>
-      </Card>
+      </StatusPanel>
     );
   }
 
   const ahead = place.position - 1;
   return (
-    <Card
+    <StatusPanel
       tone="calm"
-      icon={<Hourglass className="h-8 w-8" />}
+      icon={<Hourglass className="size-8 text-primary" />}
       title={`You're number ${place.position}`}
     >
-      <p className="text-sm text-soft">
+      <p className="text-sm text-muted-foreground">
         {ahead === 0
           ? `You're first up, ${place.name}.`
           : `${ahead} ${ahead === 1 ? "person is" : "people are"} ahead of you.`}{" "}
         Keep this page open and it&apos;ll tell you when you&apos;re next.
       </p>
-    </Card>
+    </StatusPanel>
   );
 }
 
+/** platform-design.md's status pairs: a saturated text colour on its own soft fill. */
 const TONES = {
-  calm: "border-hairline bg-card text-ink",
+  calm: "border-border bg-card text-foreground shadow-card",
   warn: "border-warn-line bg-warn-soft text-warn",
   accent: "border-success-line bg-success-soft text-success",
-  done: "border-hairline bg-card text-muted",
+  done: "border-border bg-card text-muted-foreground shadow-card",
 };
 
-function Card({
+function StatusPanel({
   tone,
   icon,
   title,
@@ -217,12 +250,14 @@ function Card({
   return (
     <div
       role="status"
-      className={`flex flex-col items-center gap-3 rounded-panel border-[1.5px] px-6 py-8 text-center ${TONES[tone]} ${
-        pulse ? "animate-pulse" : ""
-      }`}
+      className={cn(
+        "flex flex-col items-center gap-3 rounded-2xl border px-6 py-8 text-center",
+        TONES[tone],
+        pulse && "animate-pulse",
+      )}
     >
       {icon}
-      <p className="text-[1.75rem] leading-tight font-bold tracking-[-0.01em] text-balance">
+      <p className="text-[1.75rem] leading-tight font-bold tracking-[-0.028em] text-balance">
         {title}
       </p>
       {children}

@@ -11,7 +11,7 @@ import { useIsAdmin } from "@/lib/use-access";
 import { useToast } from "@/components/providers/toast-provider";
 import { ModalLayout } from "@/components/ui/modal-layout";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { iconButtonClass } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { MeetupFormModal } from "@/components/forms/meetup-form-modal";
 import { UpdateAdminActions } from "./update-admin-actions";
 
@@ -30,16 +30,16 @@ export function MeetupCard({ meetup }: { meetup: MeetupListItem }) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="card-surface w-full p-4 text-left transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-line"
+        className="rounded-xl border bg-card text-card-foreground shadow-sm w-full p-4 text-left transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-border-hover"
       >
-        <h3 className="text-[1.2rem]">{title}</h3>
-        <dl className="mt-3 space-y-1.5 text-sm text-muted">
+        <h3 className="text-base font-semibold">{title}</h3>
+        <dl className="mt-3 space-y-1.5 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
-            <CalendarDays className="h-4 w-4 text-faint" />
+            <CalendarDays className="h-4 w-4 text-muted-foreground" />
             {formatDate(meetup.date)}
           </div>
           <div className="flex items-center gap-2">
-            <MessageSquareText className="h-4 w-4 text-faint" />
+            <MessageSquareText className="h-4 w-4 text-muted-foreground" />
             {meetup.updateCount} {meetup.updateCount === 1 ? "update" : "updates"}
           </div>
         </dl>
@@ -53,7 +53,7 @@ export function MeetupCard({ meetup }: { meetup: MeetupListItem }) {
         footer={
           <Link
             href={`/meetups/${meetup._id}`}
-            className="text-sm underline underline-offset-[0.22em] transition-colors hover:text-muted"
+            className="text-sm underline underline-offset-[0.22em] transition-colors hover:text-muted-foreground"
           >
             View full page →
           </Link>
@@ -61,34 +61,42 @@ export function MeetupCard({ meetup }: { meetup: MeetupListItem }) {
         headerActions={
           isAdmin && (
             <>
-              <button aria-label="Edit meetup" onClick={() => setEditing(true)} className={iconButtonClass()}>
+              <Button
+                aria-label="Edit meetup"
+                onClick={() => setEditing(true)}
+                variant="ghost"
+                size="icon-sm"
+                className="text-muted-foreground"
+              >
                 <Pencil className="h-4 w-4" />
-              </button>
-              <button
+              </Button>
+              <Button
                 aria-label="Delete meetup"
                 onClick={() => setConfirming(true)}
-                className={iconButtonClass("danger")}
+                variant="ghost"
+                size="icon-sm"
+                className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
               >
                 <Trash2 className="h-4 w-4" />
-              </button>
+              </Button>
             </>
           )
         }
       >
-        <p className="text-sm text-muted">{formatDate(meetup.date)}</p>
+        <p className="text-sm text-muted-foreground">{formatDate(meetup.date)}</p>
         <div className="mt-4 space-y-3">
           {meetup.updates.length === 0 && (
-            <p className="py-6 text-center text-sm text-faint">
+            <p className="py-6 text-center text-sm text-muted-foreground">
               No updates were recorded at this meetup.
             </p>
           )}
           {meetup.updates.map((u) => (
-            <div key={u._id} className="rounded-media border border-hairline bg-card p-3">
+            <div key={u._id} className="rounded-lg border border-border bg-card p-3">
               <div className="flex items-start justify-between gap-2">
                 <p className="text-sm">
                   {u.memberName}
-                  <span className="text-faint"> · </span>
-                  <span className="text-muted">{u.projectName}</span>
+                  <span className="text-muted-foreground"> · </span>
+                  <span className="text-muted-foreground">{u.projectName}</span>
                 </p>
                 {isAdmin && (
                   <UpdateAdminActions
@@ -102,7 +110,7 @@ export function MeetupCard({ meetup }: { meetup: MeetupListItem }) {
                   />
                 )}
               </div>
-              <p className="mt-1.5 text-sm text-soft">{u.description}</p>
+              <p className="mt-1.5 text-sm text-muted-foreground">{u.description}</p>
             </div>
           ))}
         </div>

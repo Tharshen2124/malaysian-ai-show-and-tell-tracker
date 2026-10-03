@@ -7,7 +7,7 @@ import { ArrowUpRight, CalendarDays, MapPin, Timer } from "lucide-react";
 import { useAccess } from "@/lib/use-access";
 import { Attribution } from "@/components/ui/attribution";
 import { Wordmark } from "@/components/ui/wordmark";
-import { buttonClass } from "@/components/ui/button";
+import { buttonClass } from "@/components/ui/button-legacy";
 
 /** The org's Luma calendar, not a single event — each week gets its own listing. */
 const LUMA_CALENDAR_URL = "https://luma.com/malaysianai";
@@ -39,7 +39,7 @@ export default function LandingPage() {
           href={MALAYSIAN_AI_URL}
           target="_blank"
           rel="noreferrer noopener"
-          className="text-[0.82rem] text-muted underline-offset-[0.3rem] transition-colors hover:text-ink hover:underline"
+          className="text-[0.82rem] text-ink-muted underline-offset-[0.3rem] transition-colors hover:text-ink hover:underline"
         >
           Malaysian AI ↗
         </a>
@@ -58,10 +58,10 @@ export default function LandingPage() {
             Every project shown at the Weekly Show &amp; Tell, and the progress that followed.
           </p>
 
-          <ul className="mt-8 flex animate-soft-rise flex-col gap-2.5 text-[0.86rem] text-muted [animation-delay:0.7s] sm:flex-row sm:gap-6">
+          <ul className="mt-8 flex animate-soft-rise flex-col gap-2.5 text-[0.86rem] text-ink-muted [animation-delay:0.7s] sm:flex-row sm:gap-6">
             {EVENT_DETAILS.map(({ Icon, text }) => (
               <li key={text} className="inline-flex items-center gap-2">
-                <Icon className="h-4 w-4 shrink-0 text-accent" aria-hidden />
+                <Icon className="h-4 w-4 shrink-0 text-ink-accent" aria-hidden />
                 {text}
               </li>
             ))}
@@ -86,7 +86,7 @@ export default function LandingPage() {
 
       <footer className={`bg-site py-[clamp(2.5rem,5vw,4rem)] ${GUTTER}`}>
         <div className="mx-auto w-full max-w-[92rem]">
-          <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-2 border-t-[1.5px] border-hairline pt-5 text-[0.76rem] text-muted">
+          <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-2 border-t-[1.5px] border-hairline pt-5 text-[0.76rem] text-ink-muted">
             <p className="max-w-[40rem]">
               The tracker for the Weekly Show &amp; Tell at the{" "}
               <a

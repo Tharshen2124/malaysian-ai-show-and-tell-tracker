@@ -72,10 +72,84 @@ function publicSignup(row: Doc<"presentSignups">) {
   return { _id: row._id, name: row.name, position: row.position };
 }
 
+const MINUTE_MS = 60_000;
+
+/** The clock as it stands right now, in ms since the slot's clock was started. */
+function elapsedMs(session: Doc<"presentSessions">, now: number): number {
+  return session.clockStartedAt !== undefined
+    ? Math.max(0, now - session.clockStartedAt)
+    : (session.clockElapsedMs ?? 0);
+}
+
+/**
+ * The two marks the slot's clock passes: the handover to feedback, and the end
+ * of the slot. Derived from the session's timings plus any granted minutes, so
+ * the phase can never disagree with the figure on screen.
+ */
+function slotMarks(session: Doc<"presentSessions">) {
+  const presentationEndMs =
+    Math.round(session.presentationMinutes * MINUTE_MS) + (session.bonusPresentationMs ?? 0);
+  const slotEndMs =
+    presentationEndMs +
+    Math.round(session.feedbackMinutes * MINUTE_MS) +
+    (session.bonusFeedbackMs ?? 0);
+  return { presentationEndMs, slotEndMs };
+}
+
+/**
+ * A fresh, unstarted slot: no clock, no granted minutes, and nobody pinned
+ * against a reorder. Spread into the patch wherever the turn pointer moves.
+ */
+const CLEAR_SLOT = {
+  currentStartedAt: undefined,
+  clockStartedAt: undefined,
+  clockElapsedMs: undefined,
+  bonusPresentationMs: undefined,
+  bonusFeedbackMs: undefined,
+} as const;
+
 function assertMinutes(label: string, value: number) {
   if (!Number.isFinite(value) || value <= 0 || value > 120) {
     throw new Error(`${label} must be between 0 and 120 minutes`);
   }
+}
+
+/**
+ * Put a name on the end of the list. Shared by the phone that scanned the QR
+ * and by the admin typing in someone who could not — the rules are the same
+ * either way, and the rejection wording is read by attendees, so there is only
+ * one copy of it.
+ */
+async function insertSignup(
+  ctx: MutationCtx,
+  session: Doc<"presentSessions">,
+  name: string,
+): Promise<Id<"presentSignups">> {
+  // Stragglers keep turning up after the talks start, so the door only shuts
+  // once the session is finished.
+  if (session.status === "done") throw new Error("Sign-ups are closed");
+
+  const trimmed = name.trim();
+  if (trimmed === "") throw new Error("Name is required");
+  if (trimmed.length > MAX_NAME_LENGTH) {
+    throw new Error(`Name must be ${MAX_NAME_LENGTH} characters or fewer`);
+  }
+
+  const existing = await signupsInOrder(ctx, session._id);
+  if (existing.length >= MAX_SIGNUPS) throw new Error("This session is full");
+  if (existing.some((row) => row.name.toLowerCase() === trimmed.toLowerCase())) {
+    throw new Error("That name is already on the list");
+  }
+
+  // Late arrivals go to the bottom rather than into the middle of an order the
+  // admin may already have set — or ahead of someone who has already presented.
+  const position = existing.reduce((max, row) => Math.max(max, row.position + 1), 0);
+  return await ctx.db.insert("presentSignups", {
+    sessionId: session._id,
+    name: trimmed,
+    position,
+    updatedAt: Date.now(),
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -211,14 +285,26 @@ export const removeSignup = mutation({
         });
       } else if (removedIndex === session.currentIndex) {
         // Whoever was next has just been pushed onto the stage, so the slot
-        // begins again: unstarted, and reorderable until the clock is set going.
-        await ctx.db.patch(session._id, {
-          currentStartedAt: undefined,
-          updatedAt: Date.now(),
-        });
+        // begins again: a clock at zero, and reorderable until it is set going.
+        await ctx.db.patch(session._id, { ...CLEAR_SLOT, updatedAt: Date.now() });
       }
     }
     return null;
+  },
+});
+
+/**
+ * A name typed in by the admin, for the person whose camera would not focus,
+ * whose phone is flat, or who is simply not going to scan anything. Lands at
+ * the bottom of the list exactly as a scan would, so the two paths cannot
+ * produce a different order.
+ */
+export const addSignup = mutation({
+  args: { sessionId: v.id("presentSessions"), name: v.string() },
+  handler: async (ctx, { sessionId, name }) => {
+    await requireAdmin(ctx);
+    const session = await requireSession(ctx, sessionId);
+    return await insertSignup(ctx, session, name);
   },
 });
 
@@ -231,9 +317,9 @@ export const setStatus = mutation({
     // so a stale turn cannot be shown against a roster being rearranged. Either
     // way the clock has not been started on whoever ends up at the top.
     await ctx.db.patch(sessionId, {
+      ...CLEAR_SLOT,
       status,
       currentIndex: status === "locked" ? 0 : undefined,
-      currentStartedAt: undefined,
       updatedAt: Date.now(),
     });
     return null;
@@ -250,35 +336,139 @@ export const setCurrentIndex = mutation({
       throw new Error("No such presenter");
     }
     if (session.status !== "locked") throw new Error("The order is not locked yet");
-    // Whoever steps up gets an unstarted slot, so they can still be reordered
-    // until the admin actually sets the clock going.
+    // Whoever steps up gets an unstarted slot — a clock at zero, and they can
+    // still be reordered until the admin actually sets it going.
     await ctx.db.patch(sessionId, {
+      ...CLEAR_SLOT,
       currentIndex: index,
-      currentStartedAt: undefined,
       updatedAt: Date.now(),
     });
     return null;
   },
 });
 
+// ---------------------------------------------------------------------------
+// The slot clock. Every one of these writes the session rather than a browser,
+// so the admin's phone and the laptop on the projector are showing the same
+// clock, and either can drive it.
+//
+// Each takes the session's own state as the truth and is safe to call twice:
+// two admin devices tapping Start at the same moment land on one running clock,
+// not two.
+// ---------------------------------------------------------------------------
+
+/** The admin's device is only allowed to touch the clock while talks are on. */
+async function requireRunningSession(ctx: MutationCtx, id: Id<"presentSessions">) {
+  const session = await requireSession(ctx, id);
+  if (session.status !== "locked") throw new Error("Talks are not under way");
+  return session;
+}
+
 /**
- * The admin set the clock going on the current slot. Until this lands, the
- * person on stage is still just the next name on the list and `reorder` will
- * move them; afterwards they are pinned for the rest of their turn.
+ * Set the clock going, or pick it up again after a pause.
  *
- * Idempotent, and deliberately one-way: pausing, resetting or granting an extra
- * minute all leave the slot under way. Only the turn pointer moving clears it.
+ * This is also what records that the slot is under way. Until it lands, the
+ * person on stage is still just the next name on the list and `reorder` will
+ * move them; afterwards they are pinned for the rest of their turn, and
+ * pausing or resetting the clock does not let go of that — only the turn
+ * pointer moving does.
  */
-export const markCurrentStarted = mutation({
+export const startClock = mutation({
   args: { sessionId: v.id("presentSessions") },
   handler: async (ctx, { sessionId }) => {
     await requireAdmin(ctx);
-    const session = await requireSession(ctx, sessionId);
-    // Nothing to record against a session that is no longer running talks — and
-    // a second admin reopening setup at that moment is not worth an error.
-    if (session.status !== "locked") return null;
-    if (session.currentStartedAt !== undefined) return null;
-    await ctx.db.patch(sessionId, { currentStartedAt: Date.now(), updatedAt: Date.now() });
+    const session = await requireRunningSession(ctx, sessionId);
+    if (session.clockStartedAt !== undefined) return null; // already running
+    const now = Date.now();
+    await ctx.db.patch(sessionId, {
+      // Back-dated by whatever a pause banked, so resuming picks up where it
+      // stopped and `elapsedMs` stays a single subtraction.
+      clockStartedAt: now - (session.clockElapsedMs ?? 0),
+      // Starting the clock is also what pins the presenter against a reorder.
+      currentStartedAt: session.currentStartedAt ?? now,
+      updatedAt: now,
+    });
+    return null;
+  },
+});
+
+export const pauseClock = mutation({
+  args: { sessionId: v.id("presentSessions") },
+  handler: async (ctx, { sessionId }) => {
+    await requireAdmin(ctx);
+    const session = await requireRunningSession(ctx, sessionId);
+    if (session.clockStartedAt === undefined) return null; // already paused
+    const now = Date.now();
+    await ctx.db.patch(sessionId, {
+      clockStartedAt: undefined,
+      clockElapsedMs: elapsedMs(session, now),
+      updatedAt: now,
+    });
+    return null;
+  },
+});
+
+/**
+ * Back to zero for the same presenter. The granted minutes go with it, but
+ * `currentStartedAt` deliberately stays: their turn has still begun, so the
+ * roster must not start offering to move them.
+ */
+export const resetClock = mutation({
+  args: { sessionId: v.id("presentSessions") },
+  handler: async (ctx, { sessionId }) => {
+    await requireAdmin(ctx);
+    await requireRunningSession(ctx, sessionId);
+    await ctx.db.patch(sessionId, {
+      clockStartedAt: undefined,
+      clockElapsedMs: undefined,
+      bonusPresentationMs: undefined,
+      bonusFeedbackMs: undefined,
+      updatedAt: Date.now(),
+    });
+    return null;
+  },
+});
+
+/** Lengthens whichever window is on screen, worked out here so two devices
+ *  cannot disagree about which one that is. */
+export const addClockMinute = mutation({
+  args: { sessionId: v.id("presentSessions") },
+  handler: async (ctx, { sessionId }) => {
+    await requireAdmin(ctx);
+    const session = await requireRunningSession(ctx, sessionId);
+    const { presentationEndMs } = slotMarks(session);
+    const inPresentation = elapsedMs(session, Date.now()) < presentationEndMs;
+    await ctx.db.patch(
+      sessionId,
+      inPresentation
+        ? {
+            bonusPresentationMs: (session.bonusPresentationMs ?? 0) + MINUTE_MS,
+            updatedAt: Date.now(),
+          }
+        : { bonusFeedbackMs: (session.bonusFeedbackMs ?? 0) + MINUTE_MS, updatedAt: Date.now() },
+    );
+    return null;
+  },
+});
+
+/** Wind the clock forward to the handover mark, so feedback starts now. */
+export const skipToFeedback = mutation({
+  args: { sessionId: v.id("presentSessions") },
+  handler: async (ctx, { sessionId }) => {
+    await requireAdmin(ctx);
+    const session = await requireRunningSession(ctx, sessionId);
+    const { presentationEndMs } = slotMarks(session);
+    const now = Date.now();
+    if (elapsedMs(session, now) >= presentationEndMs) return null; // already there
+    await ctx.db.patch(sessionId, {
+      // Running stays running, paused stays paused; only the figure moves.
+      ...(session.clockStartedAt !== undefined
+        ? { clockStartedAt: now - presentationEndMs }
+        : { clockElapsedMs: presentationEndMs }),
+      // Moving a talk on is as much a start as pressing Start.
+      currentStartedAt: session.currentStartedAt ?? now,
+      updatedAt: now,
+    });
     return null;
   },
 });
@@ -325,33 +515,10 @@ export const join = mutation({
   handler: async (ctx, { code, name }) => {
     const session = await sessionByCodeDoc(ctx, code);
     if (!session) throw new Error("Unknown session");
-    // Stragglers keep turning up after the talks start, so the door only shuts
-    // once the session is finished.
-    if (session.status === "done") throw new Error("Sign-ups are closed");
-
-    const trimmed = name.trim();
-    if (trimmed === "") throw new Error("Name is required");
-    if (trimmed.length > MAX_NAME_LENGTH) {
-      throw new Error(`Name must be ${MAX_NAME_LENGTH} characters or fewer`);
-    }
-
-    const existing = await signupsInOrder(ctx, session._id);
-    if (existing.length >= MAX_SIGNUPS) throw new Error("This session is full");
-    if (existing.some((row) => row.name.toLowerCase() === trimmed.toLowerCase())) {
-      throw new Error("That name is already on the list");
-    }
-
-    // Late arrivals go to the bottom rather than into the middle of an order the
-    // admin may already have set — or ahead of someone who has already presented.
-    const position = existing.reduce((max, row) => Math.max(max, row.position + 1), 0);
-    // Handed back so the phone can watch its own place in the queue. It is the
-    // holder's own row, so it discloses nothing the sender did not just write.
-    return await ctx.db.insert("presentSignups", {
-      sessionId: session._id,
-      name: trimmed,
-      position,
-      updatedAt: Date.now(),
-    });
+    // The id is handed back so the phone can watch its own place in the queue.
+    // It is the holder's own row, so it discloses nothing the sender did not
+    // just write.
+    return await insertSignup(ctx, session, name);
   },
 });
 
@@ -392,6 +559,21 @@ export const myPlace = query({
     // means nobody is on stage rather than that the first person is.
     const currentNumber = current !== null && current < signups.length ? current + 1 : null;
 
+    // The slot clock, exactly as the admin devices read it, so the person on
+    // stage — and everyone waiting — sees the same figure as the projector.
+    // Only while somebody is actually up; otherwise there is no slot to time.
+    const clock =
+      currentNumber !== null
+        ? {
+            presentationMinutes: session.presentationMinutes,
+            feedbackMinutes: session.feedbackMinutes,
+            clockStartedAt: session.clockStartedAt,
+            clockElapsedMs: session.clockElapsedMs,
+            bonusPresentationMs: session.bonusPresentationMs,
+            bonusFeedbackMs: session.bonusFeedbackMs,
+          }
+        : null;
+
     // The running order, as it reads on the screen at the front of the room.
     // These names are already on the projector in front of everyone, and a phone
     // that cannot see the list has no way to judge how close its turn is. Holding
@@ -411,6 +593,21 @@ export const myPlace = query({
       status: session.status,
       currentNumber,
       roster,
+      clock,
     };
   },
+});
+
+/**
+ * The server's wall clock, for a device to measure how far its own is out.
+ *
+ * Every clock instant on the session is stamped here, so a phone whose clock
+ * runs a few seconds fast would otherwise show a few seconds less on the clock
+ * than the projector does. A mutation rather than a query on purpose: a query
+ * result is cached and could hand back a time that is already stale. Reads and
+ * writes nothing, so it is safe to leave open to anonymous callers.
+ */
+export const serverTime = mutation({
+  args: {},
+  handler: async () => Date.now(),
 });

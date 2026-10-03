@@ -7,7 +7,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { Loader2, TriangleAlert } from "lucide-react";
 import { useAccess } from "@/lib/use-access";
 import { Wordmark } from "@/components/ui/wordmark";
-import { buttonClass } from "@/components/ui/button";
+import { buttonClass } from "@/components/ui/button-legacy";
 
 const QUOTES = [
   "Every Thursday, someone ships something.",
@@ -98,7 +98,7 @@ export default function LoginPage() {
                 <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-danger" />
                 <div>
                   <p className="text-sm text-danger">You do not have access to this site</p>
-                  <p className="mt-1 text-sm text-muted">
+                  <p className="mt-1 text-sm text-ink-muted">
                     Ask an organiser to add{" "}
                     <span className="text-ink">{member?.email ?? "your account"}</span> before
                     signing in again.

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Loader2, TriangleAlert } from "lucide-react";
 import { ModalLayout } from "./modal-layout";
-import { buttonClass } from "./button";
+import { Button } from "@/components/ui/button";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -31,13 +31,13 @@ export function ConfirmDialog({
         <div className="rounded-full bg-danger-soft p-2 text-danger">
           <TriangleAlert className="h-5 w-5" />
         </div>
-        <p className="pt-1.5 text-sm text-muted">{description}</p>
+        <p className="pt-1.5 text-sm text-muted-foreground">{description}</p>
       </div>
       <div className="mt-6 flex justify-end gap-2">
-        <button onClick={onClose} disabled={pending} className={buttonClass("outline")}>
+        <Button onClick={onClose} disabled={pending} variant="outline">
           Cancel
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={async () => {
             setPending(true);
             try {
@@ -48,11 +48,11 @@ export function ConfirmDialog({
             }
           }}
           disabled={pending}
-          className={buttonClass("danger")}
+          variant="destructive"
         >
           {pending && <Loader2 className="h-4 w-4 animate-spin" />}
           {confirmLabel}
-        </button>
+        </Button>
       </div>
     </ModalLayout>
   );

@@ -1,4 +1,23 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+
+/*
+ * The `dark:` variant, for the shadcn component source vendored into
+ * components/ui. Its two branches are exactly the two ways `color-scheme`
+ * already resolves to dark: an explicit data-theme="dark", or the OS with no
+ * explicit choice. Driving both off the same conditions means there is no
+ * second source of truth to fall out of sync, and nothing to resolve in JS.
+ */
+@custom-variant dark {
+  &:where(html[data-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(html:not([data-theme]) *) {
+      @slot;
+    }
+  }
+}
 
 /*
  * Malaysian AI design system — see design.md. Every colour is authored once as
@@ -67,6 +86,35 @@
   --warn-line: light-dark(#8a5a1447, #ffd29a59);
 }
 
+/*
+ * shadcn's token names, mapped to the Malaysian AI palette. This is a safety
+ * net, not the design: the dashboard overrides all of it under
+ * [data-ui="shadcn"]. Without these, a shadcn utility used outside that scope
+ * resolves to an undefined var and fails *silently* — transparent fills,
+ * currentColor borders, inherited text.
+ */
+:root {
+  --radius: 0.95rem;
+  --background: var(--page-background);
+  --foreground: var(--page-text);
+  --card: var(--card-background);
+  --card-foreground: var(--text-heading);
+  --popover: var(--card-raised);
+  --popover-foreground: var(--page-text);
+  --primary: var(--button-background);
+  --primary-foreground: var(--button-text);
+  --secondary: var(--surface-background);
+  --secondary-foreground: var(--page-text);
+  --muted: var(--surface-background);
+  --muted-foreground: var(--text-muted);
+  --accent: var(--surface-background);
+  --accent-foreground: var(--page-text);
+  --destructive: var(--danger);
+  --border: var(--hairline);
+  --input: var(--hairline);
+  --ring: var(--focus-color);
+}
+
 :root[data-theme="light"] {
   color-scheme: light;
 }
@@ -75,20 +123,137 @@
   color-scheme: dark;
 }
 
+/*
+ * The dashboard, and only the dashboard: the members' platform look, from
+ * platform-design.md (platform.malaysian.ai's "residency" palette). Everything
+ * outside app/(dashboard) keeps the Malaysian AI marketing palette declared
+ * above, because @theme inline emits `var(--token)` into the utility itself, so
+ * each utility resolves against whichever scope it is used in.
+ *
+ * Authored as light-dark() pairs like :root, so `color-scheme` (the OS, or the
+ * toggle's data-theme) picks the half with no separate dark block to keep in
+ * sync. Translucent mixes are written as literal hex rather than color-mix():
+ * Lightning CSS's fallback for color-mix() is the *solid* colour, which would
+ * turn a 12% tint into a full-strength fill on a browser that lacks it.
+ */
+[data-ui="shadcn"] {
+  /* Platform faces: the system UI stack, in place of the editorial serif. */
+  --face-display:
+    -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  --face-body:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+  font-family: var(--face-body);
+  line-height: 1.5;
+
+  /* The residency palette, verbatim. */
+  --platform-bg: light-dark(#f4efe6, #080f14);
+  --platform-sidebar: light-dark(#eee8db, #0b161a);
+  --platform-paper: light-dark(#fbf8f0, #101e1b);
+  --platform-tint: light-dark(#e8e9df, #1b3129);
+  --platform-ink: light-dark(#173b36, #e7eee8);
+  --platform-muted: light-dark(#5d6d67, #a3b5ad);
+  --platform-line: light-dark(#c3cbbf, #4a5f55);
+  --platform-soft-line: light-dark(#e1dfd3, #22352d);
+  --platform-button: light-dark(#244e43, #c6dbba);
+  --platform-button-ink: light-dark(#fbf8f0, #10251b);
+
+  --radius: 0.625rem;
+  --background: var(--platform-bg);
+  --foreground: var(--platform-ink);
+  --card: var(--platform-paper);
+  --card-foreground: var(--platform-ink);
+  --popover: var(--platform-paper);
+  --popover-foreground: var(--platform-ink);
+  --primary: var(--platform-button);
+  --primary-foreground: var(--platform-button-ink);
+  /* --button mixed 82% with white. */
+  --primary-hover: light-dark(#4b6e65, #d0e1c6);
+  --secondary: var(--platform-tint);
+  --secondary-foreground: var(--platform-ink);
+  /* --tint mixed 86% with --ink. */
+  --secondary-hover: light-dark(#cbd1c7, #384c44);
+  --muted: var(--platform-tint);
+  --muted-foreground: var(--platform-muted);
+  --accent: var(--platform-tint);
+  --accent-foreground: var(--platform-ink);
+  --destructive: light-dark(#922f29, #f4a297);
+  /*
+   * Hairlines are --ink at low alpha, the same family as the sidebar's edge,
+   * so they read as a quiet grey on every surface they cross. Hover lifts to a
+   * lighter grey, the way shadcn's controls brighten their edge.
+   */
+  --border: light-dark(#173b361a, #e7eee81a); /* --ink at 10% */
+  --border-hover: light-dark(#173b3640, #e7eee838); /* --ink at 25% / 22% */
+  --input: var(--border);
+  --ring: var(--platform-button);
+
+  /* The app shell. */
+  --sidebar: var(--platform-sidebar);
+  --sidebar-edge: light-dark(#173b3612, #e7eee812); /* --ink at 7% */
+  --selection: light-dark(#244e431f, #c6dbba1f); /* --button at 12% */
+  --hover: light-dark(#173b360f, #e7eee80f); /* --ink at 6% */
+
+  /*
+   * The platform's status pairs: a saturated text colour on its own -bg fill,
+   * never a solid block. -line is the text colour at ~35% over --paper. Info
+   * has no platform token, so it borrows the accent and its selection tint.
+   */
+  --danger: var(--destructive);
+  --danger-soft: light-dark(#f2dfd9, #351d1b);
+  --danger-line: light-dark(#d6b2aa, #604c46);
+  --success: light-dark(#1f6f45, #8fd6a6);
+  --success-soft: light-dark(#dae4d6, #233a30);
+  --success-line: light-dark(#aec8b4, #3c5e4c);
+  --warn: light-dark(#83540e, #edc277);
+  --warn-soft: light-dark(#f1e4ca, #392b16);
+  --warn-line: light-dark(#d1bfa1, #5d573b);
+  --info: var(--platform-button);
+  --info-soft: light-dark(#e1e4db, #26352e);
+  --info-line: var(--platform-line);
+
+  /*
+   * The marketing tokens, re-pointed so a legacy `text-faint` or
+   * `border-hairline` inside the dashboard lands on the platform palette rather
+   * than on parchment-and-navy.
+   */
+  --page-background: var(--platform-bg);
+  --site-background: var(--platform-sidebar);
+  --surface-background: var(--platform-tint);
+  --card-background: var(--platform-paper);
+  --card-raised: var(--platform-paper);
+  --page-text: var(--platform-ink);
+  --text-heading: var(--platform-ink);
+  --text-accent: var(--platform-button);
+  --text-link: var(--platform-button);
+  --link-bright: var(--platform-ink);
+  --text-muted: var(--platform-muted);
+  --text-soft: light-dark(#173b36b8, #e7eee8b8);
+  --text-faint: light-dark(#173b3673, #e7eee880);
+  --border-color: var(--platform-line);
+  --hairline: var(--platform-soft-line);
+  --hairline-soft: var(--platform-soft-line);
+  --button-background: var(--platform-button);
+  --button-hover-background: var(--primary-hover);
+  --button-text: var(--platform-button-ink);
+  --focus-color: var(--platform-button);
+}
+
 @theme inline {
   --color-page: var(--page-background);
   --color-site: var(--site-background);
   --color-recessed: var(--surface-background);
-  --color-card: var(--card-background);
-  --color-card-raised: var(--card-raised);
+  --color-paper: var(--card-background);
+  --color-paper-raised: var(--card-raised);
   --color-scrim: var(--scrim);
 
   --color-ink: var(--page-text);
   --color-heading: var(--text-heading);
-  --color-accent: var(--text-accent);
+  --color-ink-accent: var(--text-accent);
   --color-link: var(--text-link);
   --color-link-bright: var(--link-bright);
-  --color-muted: var(--text-muted);
+  --color-ink-muted: var(--text-muted);
   --color-soft: var(--text-soft);
   --color-faint: var(--text-faint);
 
@@ -115,6 +280,44 @@
   --color-warn-soft: var(--warn-soft);
   --color-warn-line: var(--warn-line);
 
+  /* shadcn's namespace. Resolves per-scope — see the comment above. */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-border-hover: var(--border-hover);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary-hover: var(--primary-hover);
+  --color-secondary-hover: var(--secondary-hover);
+
+  /* The dashboard's app shell; only defined under [data-ui="shadcn"]. */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-edge: var(--sidebar-edge);
+  --color-selection: var(--selection);
+  --color-hover: var(--hover);
+
+  /* shadcn's radius scale, derived from one --radius. Safe to define globally:
+     nothing in the app used rounded-sm|md|lg|xl|2xl|3xl before this change. */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+
   --font-sans: var(--face-body);
   --font-display: var(--face-display);
   --font-pixel: var(--face-pixel);
@@ -123,6 +326,8 @@
 @theme {
   /* design.md's one dominant phone breakpoint. */
   --breakpoint-sm: 43.75rem;
+  /* platform-design.md: above this the sidebar is docked, below it is a drawer. */
+  --breakpoint-shell: 56.25rem;
 
   --radius-button: 0.45rem;
   --radius-media: 0.7rem;
@@ -132,6 +337,11 @@
   --shadow-float: 0 0.75rem 1.75rem #00000057, 0 0 0 1px light-dark(#0000, #aeccf24d);
 
   --ease-settle: cubic-bezier(0.2, 0.75, 0.2, 1);
+  /* The platform's sidebar, pill and drawer easing. */
+  --ease-shell: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* platform-design.md level 1: a whisper in light mode, nothing in dark. */
+  --shadow-card: 0 1px 2px light-dark(#0000000a, #0000), 0 2px 14px light-dark(#00000008, #0000);
 
   --animate-soft-rise: soft-rise 0.7s ease-out both;
 
@@ -158,7 +368,7 @@
   }
 
   /* Page headers are Instrument Serif at 400 — emphasis comes from size and tightness, never bold. */
-  h1 {
+  h1:not([data-ui="shadcn"] *) {
     font-family: var(--face-display);
     font-weight: 400;
     line-height: 0.9;
@@ -168,14 +378,46 @@
   }
 
   /* Everything below a page header is set in Atkinson; bold carries the hierarchy. */
-  h2,
-  h3 {
+  h2:not([data-ui="shadcn"] *),
+  h3:not([data-ui="shadcn"] *) {
     font-family: var(--face-body);
     font-weight: 700;
     line-height: 1.2;
     letter-spacing: -0.01em;
     color: var(--text-heading);
     text-wrap: balance;
+  }
+
+  /*
+   * Dashboard headings, per platform-design.md: one system face, hierarchy from
+   * weight. Page titles are 700 at -0.028em; everything below is 600.
+   */
+  [data-ui="shadcn"] :is(h1, h2, h3, h4) {
+    font-family: var(--face-body);
+    font-weight: 600;
+    letter-spacing: -0.018em;
+    line-height: 1.22;
+    color: var(--foreground);
+    text-wrap: balance;
+  }
+  [data-ui="shadcn"] h1 {
+    font-family: var(--face-display);
+    font-weight: 700;
+    letter-spacing: -0.028em;
+    line-height: 1.1;
+  }
+
+  /*
+   * Tailwind v4 defaults a bare `border` to currentColor, which in the dashboard
+   * is the near-white ink. shadcn's install pairs it with this rule; scoped here
+   * so the marketing pages keep their own border colours. Being in the base
+   * layer, any border-* utility still wins.
+   */
+  [data-ui="shadcn"],
+  [data-ui="shadcn"] *,
+  [data-ui="shadcn"] ::before,
+  [data-ui="shadcn"] ::after {
+    border-color: var(--border);
   }
 
   img {
@@ -186,6 +428,11 @@
   :focus-visible {
     outline: 2px solid var(--focus-color);
     outline-offset: 3px;
+  }
+
+  [data-ui="shadcn"] :focus-visible {
+    outline-color: var(--ring);
+    outline-offset: 2px;
   }
 
   ::selection {
@@ -242,15 +489,6 @@
   }
 }
 
-/*
- * Drops the card fill in dark mode only — on ink navy the hairline alone is
- * enough of an edge, and the page reads quieter. Scoped to whatever carries the
- * class, since `card-surface` and `field-input` both read --card-background.
- */
-@utility flat-cards {
-  --card-background: light-dark(#fffaf2, transparent);
-}
-
 /* Structural surface: flat, separated by a hairline, never a resting shadow. */
 @utility card-surface {
   background-color: var(--card-background);
@@ -302,11 +540,6 @@
 @utility page-title {
   font-size: clamp(2.3rem, 3.8vw, 3.6rem);
   line-height: 0.9;
-}
-
-@utility section-title {
-  font-size: clamp(1.3rem, 1.9vw, 1.6rem);
-  line-height: 1.2;
 }
 
 /* Big figures (stats, metrics, the presenter clock) are set in the body face. */

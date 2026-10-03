@@ -4,7 +4,8 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { Mic, Sparkles } from "lucide-react";
-import { buttonClass } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 /** The two moments worth interrupting someone's phone for. */
 export type AlertKind = "next" | "presenting";
@@ -15,13 +16,13 @@ const COPY: Record<AlertKind, { title: string; body: string; tone: string; icon:
       title: "You're up next!",
       body: "Wrap up what you're doing and make your way to the front.",
       tone: "border-warn-line bg-warn-soft text-warn",
-      icon: <Sparkles className="h-12 w-12" />,
+      icon: <Sparkles className="size-12" />,
     },
     presenting: {
       title: "You're presenting now!",
       body: "You're on — go for it.",
       tone: "border-success-line bg-success-soft text-success",
-      icon: <Mic className="h-12 w-12" />,
+      icon: <Mic className="size-12" />,
     },
   };
 
@@ -55,7 +56,9 @@ export function PlaceAlert({ kind, onClose }: { kind: AlertKind | null; onClose:
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
           onMouseDown={onClose}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-5"
+          // Portalled to <body>, outside app/join's scope, so it re-declares it.
+          data-ui="shadcn"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#08100e8c] p-5 backdrop-blur-[2px]"
         >
           <motion.div
             role="alertdialog"
@@ -68,16 +71,19 @@ export function PlaceAlert({ kind, onClose }: { kind: AlertKind | null; onClose:
             // The tap that dismisses is the scrim's; swallow it here so a tap on
             // the card itself doesn't close what they are still reading.
             onMouseDown={(e) => e.stopPropagation()}
-            className={`flex w-full max-w-sm flex-col items-center gap-4 rounded-panel border-[1.5px] px-6 py-10 text-center shadow-float ${copy.tone}`}
+            className={cn(
+              "flex w-full max-w-sm flex-col items-center gap-4 rounded-2xl border px-6 py-10 text-center shadow-[0_12px_40px_#0000003d]",
+              copy.tone,
+            )}
           >
             {copy.icon}
-            <p className="text-[clamp(2rem,9vw,2.75rem)] leading-[1.05] font-bold tracking-[-0.01em] text-balance">
+            <p className="text-[clamp(2rem,9vw,2.75rem)] leading-[1.05] font-bold tracking-[-0.028em] text-balance">
               {copy.title}
             </p>
             <p className="text-sm">{copy.body}</p>
-            <button onClick={onClose} className={`${buttonClass("outline")} mt-2`}>
+            <Button onClick={onClose} variant="outline" size="lg" className="mt-2 text-foreground">
               Got it
-            </button>
+            </Button>
           </motion.div>
         </motion.div>
       )}

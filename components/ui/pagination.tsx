@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { iconButtonClass } from "./button";
+import { Button } from "./button";
 
 interface PaginationProps {
   /**
@@ -24,26 +24,28 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
 
   return (
     <nav aria-label="Pagination" className="flex justify-center">
-      <div className="flex items-center gap-1 rounded-button border-[1.5px] border-hairline bg-card p-1 text-sm">
-        <button
+      <div className="flex items-center gap-1 rounded-md border bg-card p-1 text-sm">
+        <Button
+          variant="ghost"
+          size="icon-sm"
           aria-label="Previous page"
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
-          className={`${iconButtonClass()} disabled:cursor-not-allowed max-sm:h-11 max-sm:w-11`}
         >
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-        <span className="min-w-16 text-center text-muted tabular-nums">
+          <ChevronLeft />
+        </Button>
+        <span className="min-w-16 text-center text-muted-foreground tabular-nums">
           {page} – {totalPages}
         </span>
-        <button
+        <Button
+          variant="ghost"
+          size="icon-sm"
           aria-label="Next page"
           disabled={page >= totalPages}
           onClick={() => onPageChange(page + 1)}
-          className={`${iconButtonClass()} disabled:cursor-not-allowed max-sm:h-11 max-sm:w-11`}
         >
-          <ChevronRight className="h-4 w-4" />
-        </button>
+          <ChevronRight />
+        </Button>
       </div>
     </nav>
   );

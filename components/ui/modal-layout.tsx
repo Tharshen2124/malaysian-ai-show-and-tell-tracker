@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { X } from "lucide-react";
 import { ReactNode, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { iconButtonClass } from "./button";
+import { Button } from "./button";
 
 interface ModalLayoutProps {
   open: boolean;
@@ -76,7 +76,11 @@ export function ModalLayout({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
-          className="fixed inset-0 z-50 flex items-end justify-center bg-scrim p-0 sm:items-center sm:p-6"
+          // The portal target is <body>, outside the dashboard subtree, so the
+          // overlay must re-declare the scope or it renders in the Malaysian AI
+          // palette. Only dashboard code mounts this component.
+          data-ui="shadcn"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-6"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) onClose();
           }}
@@ -90,23 +94,27 @@ export function ModalLayout({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 16 }}
             transition={{ duration: 0.18, ease: [0.2, 0.75, 0.2, 1] }}
-            className={`flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-panel border border-hairline bg-card-raised shadow-float sm:rounded-panel ${
+            className={`flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-2xl border bg-card text-foreground shadow-lg sm:rounded-2xl ${
               wide ? "sm:max-w-2xl" : "sm:max-w-lg"
             }`}
           >
-            <div className="flex items-center justify-between gap-3 border-b border-hairline px-5 py-4">
-              <h2 className="text-[1.25rem]">{title}</h2>
+            <div className="flex items-center justify-between gap-3 border-b px-6 py-4">
+              <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
               <div className="flex shrink-0 items-center gap-1">
                 {headerActions}
-                <button aria-label="Close" onClick={onClose} className={iconButtonClass()}>
-                  <X className="h-5 w-5" />
-                </button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Close"
+                  onClick={onClose}
+                  className="text-muted-foreground"
+                >
+                  <X />
+                </Button>
               </div>
             </div>
-            <div className="overflow-y-auto px-5 py-4">{children}</div>
-            {footer && (
-              <div className="shrink-0 border-t border-hairline px-5 py-3">{footer}</div>
-            )}
+            <div className="overflow-y-auto px-6 py-4">{children}</div>
+            {footer && <div className="shrink-0 border-t px-6 py-3">{footer}</div>}
           </motion.div>
         </motion.div>
       )}

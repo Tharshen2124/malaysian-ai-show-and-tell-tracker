@@ -10,8 +10,9 @@ import { ModalLayout } from "@/components/ui/modal-layout";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { MultiSelectDropdown } from "@/components/ui/multi-select-dropdown";
 import { InlineErrorBanner } from "@/components/ui/error-state";
-import { buttonClass } from "@/components/ui/button";
-import { Field, inputClass, RadioRow } from "./field";
+import { Button } from "@/components/ui/button";
+import { Field, RadioRow } from "./field";
+import { Input } from "@/components/ui/input";
 import { ProjectCategory } from "@/lib/labels";
 
 const schema = z.object({
@@ -42,7 +43,13 @@ export function ProjectFormModal({ open, onClose, initial }: ProjectFormModalPro
   );
 }
 
-function ProjectFormFields({ initial, onClose }: { initial?: ProjectInitial; onClose: () => void }) {
+function ProjectFormFields({
+  initial,
+  onClose,
+}: {
+  initial?: ProjectInitial;
+  onClose: () => void;
+}) {
   const toast = useToast();
   const formOptions = useQuery(api.updates.formOptions, {});
   const createProject = useMutation(api.projects.create);
@@ -93,18 +100,16 @@ function ProjectFormFields({ initial, onClose }: { initial?: ProjectInitial; onC
     }
   };
 
-  const memberOptions =
-    formOptions?.members.map((m) => ({ value: m.id, label: m.name })) ?? [];
+  const memberOptions = formOptions?.members.map((m) => ({ value: m.id, label: m.name })) ?? [];
 
   return (
     <form onSubmit={submit} className="space-y-4">
       {error && <InlineErrorBanner message={error} />}
       <Field label="Name">
-        <input
+        <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g. LRT Live Map"
-          className={inputClass}
         />
       </Field>
       <Field label="Members">
@@ -136,9 +141,9 @@ function ProjectFormFields({ initial, onClose }: { initial?: ProjectInitial; onC
         Is project completed?
       </label>
       <div className="flex justify-end gap-2 pt-2">
-        <button type="button" onClick={onClose} className={buttonClass("outline")}>
+        <Button type="button" onClick={onClose} variant="outline">
           Cancel
-        </button>
+        </Button>
         <SubmitButton pending={pending}>{initial ? "Save changes" : "Add project"}</SubmitButton>
       </div>
     </form>

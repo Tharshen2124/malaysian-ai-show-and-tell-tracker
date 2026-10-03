@@ -1,15 +1,16 @@
 "use client";
 
 import { use, useEffect } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
-import { ArrowLeft } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useAccess } from "@/lib/use-access";
 import { MemberForm } from "@/components/forms/member-form";
 import { ErrorState } from "@/components/ui/error-state";
+import { BackLink } from "@/components/ui/back-link";
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function MemberEditPage({ params }: PageProps<"/members/[id]/edit">) {
   const { id } = use(params);
@@ -29,18 +30,12 @@ export default function MemberEditPage({ params }: PageProps<"/members/[id]/edit
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <Link
-        href={`/members/${id}`}
-        className="inline-flex items-center gap-1.5 text-[0.82rem] text-muted transition-colors hover:text-ink"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to member
-      </Link>
-      <h1 className="page-title">Edit member</h1>
+      <BackLink href={`/members/${id}`}>Back to member</BackLink>
+      <h1 className="text-3xl tracking-tight">Edit member</h1>
       {member === undefined ? (
-        <div className="h-64 animate-pulse rounded-panel bg-recessed" />
+        <Skeleton className="h-64 w-full" />
       ) : (
-        <div className="card-surface p-6">
+        <Card className="p-6">
           <MemberForm
             initial={{
               id: member._id,
@@ -53,7 +48,7 @@ export default function MemberEditPage({ params }: PageProps<"/members/[id]/edit
             onSaved={() => router.push(`/members/${id}`)}
             onCancel={() => router.push(`/members/${id}`)}
           />
-        </div>
+        </Card>
       )}
     </div>
   );

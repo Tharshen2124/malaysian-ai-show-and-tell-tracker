@@ -2,7 +2,15 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { CheckCircle2, Info, XCircle, X } from "lucide-react";
-import { createContext, ReactNode, useCallback, useContext, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 type ToastVariant = "success" | "error" | "info";
 
@@ -66,7 +74,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
-      <div className="pointer-events-none fixed top-4 right-4 z-[100] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2">
+      {/*
+        This provider is mounted in the root layout, so the viewport is a sibling
+        of {children} and sits outside the dashboard subtree. Every toast in the
+        app is fired from dashboard code, so it declares the scope outright
+        rather than switching on the route.
+      */}
+      <div
+        data-ui="shadcn"
+        className="pointer-events-none fixed top-4 right-4 z-[100] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2"
+      >
         <AnimatePresence>
           {toasts.map((toast) => {
             const Icon = ICONS[toast.variant];
@@ -78,14 +95,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, x: 24 }}
                 transition={{ duration: 0.18, ease: [0.2, 0.75, 0.2, 1] }}
-                className={`pointer-events-auto flex items-start gap-2.5 rounded-media border bg-card-raised px-3.5 py-3 text-ink shadow-float ${VARIANT_CLASSES[toast.variant]}`}
+                className={`pointer-events-auto flex items-start gap-2.5 rounded-lg border bg-popover px-3.5 py-3 text-popover-foreground shadow-lg ${VARIANT_CLASSES[toast.variant]}`}
               >
                 <Icon className="mt-0.5 h-4 w-4 shrink-0" />
                 <p className="flex-1 text-sm">{toast.message}</p>
                 <button
                   onClick={() => dismiss(toast.id)}
                   aria-label="Dismiss"
-                  className="text-faint transition-colors hover:text-ink"
+                  className="text-muted-foreground transition-colors hover:text-foreground"
                 >
                   <X className="h-4 w-4" />
                 </button>

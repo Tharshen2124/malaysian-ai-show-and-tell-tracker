@@ -11,10 +11,11 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { SearchableDropdown } from "@/components/ui/searchable-dropdown";
 import { InlineErrorBanner } from "@/components/ui/error-state";
 import { DictationButton } from "@/components/ui/dictation-button";
-import { buttonClass } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { transcribeAudio } from "@/lib/transcribe";
 import { useTranscriptionQueue } from "@/lib/transcription-queue";
-import { Field, inputClass } from "./field";
+import { Field } from "./field";
+import { Textarea } from "@/components/ui/textarea";
 import { formatDate } from "@/lib/format";
 
 const schema = z.object({
@@ -195,7 +196,7 @@ function UpdateFormFields({ initial, onClose }: { initial?: UpdateInitial; onClo
         {/* The mic sits outside the label: a control nested in a <label> also
             retargets its clicks at the textarea. */}
         <div className="mb-1.5 flex items-center justify-between gap-2">
-          <label htmlFor="update-description" className="text-sm text-muted">
+          <label htmlFor="update-description" className="text-sm text-muted-foreground">
             Description
           </label>
           {initial ? (
@@ -213,25 +214,24 @@ function UpdateFormFields({ initial, onClose }: { initial?: UpdateInitial; onClo
             />
           )}
         </div>
-        <textarea
+        <Textarea
           id="update-description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={4}
           placeholder="What was talked about?"
-          className={inputClass}
         />
         {!initial && (
-          <p className="mt-1.5 text-xs text-faint">
-            Recording saves this update on its own once transcribed, so you can move straight to
-            the next person. Type here instead to write it out by hand.
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Recording saves this update on its own once transcribed, so you can move straight to the
+            next person. Type here instead to write it out by hand.
           </p>
         )}
       </div>
       <div className="flex justify-end gap-2 pt-2">
-        <button type="button" onClick={onClose} className={buttonClass("outline")}>
+        <Button type="button" onClick={onClose} variant="outline">
           Cancel
-        </button>
+        </Button>
         <SubmitButton pending={pending}>{initial ? "Save changes" : "Add update"}</SubmitButton>
       </div>
     </form>

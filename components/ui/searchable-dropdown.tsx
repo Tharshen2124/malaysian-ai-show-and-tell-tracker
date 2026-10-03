@@ -1,6 +1,8 @@
 "use client";
 
 import { Check, ChevronsUpDown, Search } from "lucide-react";
+import { buttonVariants } from "./button";
+import { cn } from "@/lib/utils";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 export interface DropdownOption {
@@ -98,23 +100,29 @@ export function SearchableDropdown({
         type="button"
         disabled={disabled}
         onClick={toggleOpen}
-        className="field-input flex items-center justify-between gap-2 text-left"
+        aria-expanded={open}
+        className={cn(
+          buttonVariants({ variant: "outline" }),
+          "w-full justify-between gap-2 font-normal",
+        )}
       >
-        <span className={selected ? "" : "text-faint"}>{selected ? selected.label : placeholder}</span>
-        <ChevronsUpDown className="h-4 w-4 shrink-0 text-faint" />
+        <span className={selected ? "" : "text-muted-foreground"}>
+          {selected ? selected.label : placeholder}
+        </span>
+        <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" />
       </button>
 
       {open && (
-        <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-media border border-hairline bg-card-raised shadow-float">
-          <div className="flex items-center gap-2 border-b border-hairline px-3 py-2">
-            <Search className="h-4 w-4 text-faint" />
+        <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-lg border border-border bg-popover shadow-lg">
+          <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+            <Search className="h-4 w-4 text-muted-foreground" />
             <input
               ref={searchRef}
               value={filter}
               onChange={(e) => setFilterAndResetHighlight(e.target.value)}
               onKeyDown={onKeyDown}
               placeholder="Filter…"
-              className="w-full bg-transparent text-sm outline-none placeholder:text-faint"
+              className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
           </div>
           <div className="max-h-56 overflow-y-auto py-1">
@@ -126,15 +134,21 @@ export function SearchableDropdown({
                   setOpen(false);
                   setFilter("");
                 }}
-                className="w-full px-3 py-2 text-left text-sm text-faint hover:bg-recessed"
+                className="w-full px-3 py-2 text-left text-sm text-muted-foreground hover:bg-muted"
               >
                 — None —
               </button>
             )}
-            {flat.length === 0 && <p className="px-3 py-3 text-sm text-faint">No matches.</p>}
+            {flat.length === 0 && (
+              <p className="px-3 py-3 text-sm text-muted-foreground">No matches.</p>
+            )}
             {filteredGroups.map((group) => (
               <div key={group.label}>
-                {group.label && <p className="kicker px-3 pt-2 pb-1">{group.label}</p>}
+                {group.label && (
+                  <p className="text-xs font-medium text-muted-foreground px-3 pt-2 pb-1">
+                    {group.label}
+                  </p>
+                )}
                 {group.options.map((option) => {
                   const index = flat.indexOf(option);
                   return (
@@ -144,7 +158,7 @@ export function SearchableDropdown({
                       onClick={() => select(option.value)}
                       onMouseEnter={() => setHighlight(index)}
                       className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm ${
-                        index === highlight ? "bg-recessed" : ""
+                        index === highlight ? "bg-muted" : ""
                       }`}
                     >
                       {option.label}

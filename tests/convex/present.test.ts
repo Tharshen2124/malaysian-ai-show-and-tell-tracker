@@ -1,5 +1,5 @@
 import { convexTest } from "convex-test";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
 import { modules } from "./test.setup";
@@ -15,6 +15,23 @@ async function startSession(t: ReturnType<typeof convexTest>) {
 
 /** A client acting as one signed-in person. */
 type Identity = ReturnType<ReturnType<typeof convexTest>["withIdentity"]>;
+
+/** Four people, talks under way, Janelle (index 1) on stage. */
+async function midSession(t: ReturnType<typeof convexTest>) {
+  const started = await startSession(t);
+  const { admin, sessionId, code } = started;
+  const ids = [];
+  for (const name of ["Aiden", "Janelle", "Hesham", "Latecomer"]) {
+    ids.push(await t.mutation(api.present.join, { code, name }));
+  }
+  await admin.mutation(api.present.setStatus, { sessionId, status: "locked" });
+  await admin.mutation(api.present.setCurrentIndex, { sessionId, index: 1 });
+  return { ...started, ids };
+}
+
+/** The session as a second admin device reads it. */
+const sessionState = async (admin: Identity) =>
+  (await admin.query(api.present.activeSession, {}))!;
 
 async function namesInOrder(admin: Identity) {
   const session = await admin.query(api.present.activeSession, {});
@@ -232,7 +249,7 @@ describe("present.reorder", () => {
 
     await expect(pullAidenBack()).rejects.toThrow("Only people who haven't presented can be moved");
 
-    await admin.mutation(api.present.markCurrentStarted, { sessionId });
+    await admin.mutation(api.present.startClock, { sessionId });
     await expect(pullAidenBack()).rejects.toThrow("Only people still waiting can be moved");
   });
 
@@ -261,7 +278,7 @@ describe("present.reorder", () => {
     const { admin, sessionId, ids } = await midSession(t);
     const [aiden, janelle, hesham, latecomer] = ids;
 
-    await admin.mutation(api.present.markCurrentStarted, { sessionId });
+    await admin.mutation(api.present.startClock, { sessionId });
 
     // Janelle, now mid-talk, pushed down the queue.
     await expect(
@@ -280,33 +297,25 @@ describe("present.reorder", () => {
   });
 });
 
-describe("present.markCurrentStarted", () => {
-  /** Four people, talks under way, Janelle (index 1) on stage. */
-  async function midSession(t: ReturnType<typeof convexTest>) {
-    const started = await startSession(t);
-    const { admin, sessionId, code } = started;
-    const ids = [];
-    for (const name of ["Aiden", "Janelle", "Hesham", "Latecomer"]) {
-      ids.push(await t.mutation(api.present.join, { code, name }));
-    }
-    await admin.mutation(api.present.setStatus, { sessionId, status: "locked" });
-    await admin.mutation(api.present.setCurrentIndex, { sessionId, index: 1 });
-    return { ...started, ids };
-  }
-
+describe("present.startClock — pinning the person on stage", () => {
   const startedAt = async (admin: Identity) =>
     (await admin.query(api.present.activeSession, {}))!.currentStartedAt;
 
-  it("records the slot once and leaves it alone on a second call", async () => {
+  it("records the slot once and leaves it alone when the clock stops and starts", async () => {
     const t = convexTest(schema, modules);
     const { admin, sessionId } = await midSession(t);
 
-    await admin.mutation(api.present.markCurrentStarted, { sessionId });
+    await admin.mutation(api.present.startClock, { sessionId });
     const first = await startedAt(admin);
     expect(first).toBeTypeOf("number");
 
     // Pausing and resuming must not re-stamp a slot already under way.
-    await admin.mutation(api.present.markCurrentStarted, { sessionId });
+    await admin.mutation(api.present.pauseClock, { sessionId });
+    await admin.mutation(api.present.startClock, { sessionId });
+    expect(await startedAt(admin)).toBe(first);
+
+    // Nor does putting the clock back to zero for the same presenter.
+    await admin.mutation(api.present.resetClock, { sessionId });
     expect(await startedAt(admin)).toBe(first);
   });
 
@@ -314,7 +323,7 @@ describe("present.markCurrentStarted", () => {
     const t = convexTest(schema, modules);
     const { admin, sessionId, ids } = await midSession(t);
     const [aiden, janelle, hesham, latecomer] = ids;
-    await admin.mutation(api.present.markCurrentStarted, { sessionId });
+    await admin.mutation(api.present.startClock, { sessionId });
 
     await admin.mutation(api.present.setCurrentIndex, { sessionId, index: 2 });
 
@@ -331,7 +340,7 @@ describe("present.markCurrentStarted", () => {
     const t = convexTest(schema, modules);
     const { admin, sessionId, ids } = await midSession(t);
     const [, janelle] = ids;
-    await admin.mutation(api.present.markCurrentStarted, { sessionId });
+    await admin.mutation(api.present.startClock, { sessionId });
 
     await admin.mutation(api.present.removeSignup, { id: janelle });
 
@@ -344,7 +353,7 @@ describe("present.markCurrentStarted", () => {
     const t = convexTest(schema, modules);
     const { admin, sessionId, ids } = await midSession(t);
     const [aiden] = ids;
-    await admin.mutation(api.present.markCurrentStarted, { sessionId });
+    await admin.mutation(api.present.startClock, { sessionId });
 
     await admin.mutation(api.present.removeSignup, { id: aiden });
 
@@ -354,11 +363,11 @@ describe("present.markCurrentStarted", () => {
   it("is dropped when the order is reopened, and rejects a non-admin", async () => {
     const t = convexTest(schema, modules);
     const { admin, member, sessionId } = await midSession(t);
-    await admin.mutation(api.present.markCurrentStarted, { sessionId });
+    await admin.mutation(api.present.startClock, { sessionId });
 
-    await expect(
-      member.mutation(api.present.markCurrentStarted, { sessionId }),
-    ).rejects.toThrow("Admin access required");
+    await expect(member.mutation(api.present.startClock, { sessionId })).rejects.toThrow(
+      "Admin access required",
+    );
 
     await admin.mutation(api.present.setStatus, { sessionId, status: "collecting" });
     expect(await startedAt(admin)).toBeUndefined();
@@ -502,6 +511,8 @@ describe("present.myPlace — what an attendee's phone sees", () => {
         { name: "Janelle", number: 2, isYou: true },
         { name: "Hesham", number: 3, isYou: false },
       ],
+      // Nor is there a slot to time.
+      clock: null,
     });
   });
 
@@ -659,5 +670,311 @@ describe("present.setCurrentIndex", () => {
     await expect(
       admin.mutation(api.present.setCurrentIndex, { sessionId, index: 5 }),
     ).rejects.toThrow("No such presenter");
+  });
+});
+
+describe("present.addSignup — the name the admin types in", () => {
+  it("puts someone who could not scan at the bottom of the list", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId, code } = await startSession(t);
+    await t.mutation(api.present.join, { code, name: "Aiden" });
+
+    await admin.mutation(api.present.addSignup, { sessionId, name: "  Flat Battery  " });
+
+    // Trimmed, and behind the name that was already in.
+    expect(await namesInOrder(admin)).toEqual(["Aiden", "Flat Battery"]);
+  });
+
+  it("still takes a name once talks are under way, behind everyone waiting", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId } = await midSession(t);
+
+    await admin.mutation(api.present.addSignup, { sessionId, name: "Hand Up At The Back" });
+
+    expect(await namesInOrder(admin)).toEqual([
+      "Aiden",
+      "Janelle",
+      "Hesham",
+      "Latecomer",
+      "Hand Up At The Back",
+    ]);
+  });
+
+  it("holds to the same rules as a scan", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId, code } = await startSession(t);
+    await t.mutation(api.present.join, { code, name: "Aiden" });
+
+    await expect(
+      admin.mutation(api.present.addSignup, { sessionId, name: "aiden" }),
+    ).rejects.toThrow("That name is already on the list");
+    await expect(admin.mutation(api.present.addSignup, { sessionId, name: "   " })).rejects.toThrow(
+      "Name is required",
+    );
+    await expect(
+      admin.mutation(api.present.addSignup, { sessionId, name: "x".repeat(61) }),
+    ).rejects.toThrow("60 characters or fewer");
+    expect(await namesInOrder(admin)).toEqual(["Aiden"]);
+  });
+
+  it("rejects a non-admin member", async () => {
+    const t = convexTest(schema, modules);
+    const { member, sessionId } = await startSession(t);
+
+    await expect(
+      member.mutation(api.present.addSignup, { sessionId, name: "Sneaky" }),
+    ).rejects.toThrow("Admin access required");
+  });
+});
+
+describe("present clock — one clock, every admin device", () => {
+  // Only Date is faked: convex-test's own scheduling still needs real timers.
+  const T0 = new Date("2026-10-01T10:00:00.000Z").getTime();
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(T0);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("hands the running clock to whoever reads the session next", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId } = await midSession(t);
+
+    await admin.mutation(api.present.startClock, { sessionId });
+
+    // What the organiser's phone gets: a start instant it can subtract from its
+    // own wall clock, rather than a figure that was only ever in one browser.
+    const session = await sessionState(admin);
+    expect(session.clockStartedAt).toBe(T0);
+    expect(session.clockElapsedMs).toBeUndefined();
+    // Starting the clock is also what pins the presenter against a reorder.
+    expect(session.currentStartedAt).toBe(T0);
+  });
+
+  it("leaves a clock that is already running alone", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId } = await midSession(t);
+    await admin.mutation(api.present.startClock, { sessionId });
+
+    // The second device's tap, a minute in: it must not restart the room's clock.
+    vi.setSystemTime(T0 + 60_000);
+    await admin.mutation(api.present.startClock, { sessionId });
+
+    expect((await sessionState(admin)).clockStartedAt).toBe(T0);
+  });
+
+  it("banks the elapsed time on a pause and picks it up again on resume", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId } = await midSession(t);
+    await admin.mutation(api.present.startClock, { sessionId });
+
+    vi.setSystemTime(T0 + 90_000);
+    await admin.mutation(api.present.pauseClock, { sessionId });
+
+    const paused = await sessionState(admin);
+    expect(paused.clockStartedAt).toBeUndefined();
+    expect(paused.clockElapsedMs).toBe(90_000);
+
+    // Resumed ten minutes later: the clock reads 1:30, not 11:30, because the
+    // start instant is back-dated by what the pause banked.
+    vi.setSystemTime(T0 + 600_000);
+    await admin.mutation(api.present.startClock, { sessionId });
+    expect((await sessionState(admin)).clockStartedAt).toBe(T0 + 600_000 - 90_000);
+  });
+
+  it("puts the clock back to zero on a reset, but keeps the turn under way", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId, ids } = await midSession(t);
+    const [aiden, janelle, hesham, latecomer] = ids;
+    await admin.mutation(api.present.startClock, { sessionId });
+    await admin.mutation(api.present.addClockMinute, { sessionId });
+
+    await admin.mutation(api.present.resetClock, { sessionId });
+
+    const session = await sessionState(admin);
+    expect(session.clockStartedAt).toBeUndefined();
+    expect(session.clockElapsedMs).toBeUndefined();
+    expect(session.bonusPresentationMs).toBeUndefined();
+    // Janelle has still had her turn started, so she stays pinned.
+    expect(session.currentStartedAt).toBe(T0);
+    await expect(
+      admin.mutation(api.present.reorder, {
+        sessionId,
+        orderedIds: [janelle, aiden, hesham, latecomer],
+      }),
+    ).rejects.toThrow("Only people still waiting can be moved");
+  });
+
+  it("grants the extra minute to whichever window is running", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId } = await midSession(t);
+    await admin.mutation(api.present.startClock, { sessionId });
+
+    // A minute into a three-minute talk.
+    vi.setSystemTime(T0 + 60_000);
+    await admin.mutation(api.present.addClockMinute, { sessionId });
+    expect((await sessionState(admin)).bonusPresentationMs).toBe(60_000);
+
+    // Four minutes in, which — with that extra minute — is now feedback.
+    vi.setSystemTime(T0 + 240_000);
+    await admin.mutation(api.present.addClockMinute, { sessionId });
+    const session = await sessionState(admin);
+    expect(session.bonusPresentationMs).toBe(60_000);
+    expect(session.bonusFeedbackMs).toBe(60_000);
+  });
+
+  it("winds a running clock forward to the handover mark", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId } = await midSession(t);
+    await admin.mutation(api.present.startClock, { sessionId });
+
+    vi.setSystemTime(T0 + 30_000);
+    await admin.mutation(api.present.skipToFeedback, { sessionId });
+
+    // The three-minute presentation now reads as fully elapsed, and the clock
+    // is still running — into the feedback window.
+    expect((await sessionState(admin)).clockStartedAt).toBe(T0 + 30_000 - 180_000);
+
+    // A second tap has nothing left to skip.
+    await admin.mutation(api.present.skipToFeedback, { sessionId });
+    expect((await sessionState(admin)).clockStartedAt).toBe(T0 + 30_000 - 180_000);
+  });
+
+  it("skips a paused clock without setting it going", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId } = await midSession(t);
+
+    await admin.mutation(api.present.skipToFeedback, { sessionId });
+
+    const session = await sessionState(admin);
+    expect(session.clockStartedAt).toBeUndefined();
+    expect(session.clockElapsedMs).toBe(180_000);
+    // Moving a talk on is as much a start as pressing Start.
+    expect(session.currentStartedAt).toBe(T0);
+  });
+
+  it("starts the next presenter on a clock of their own", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId } = await midSession(t);
+    await admin.mutation(api.present.startClock, { sessionId });
+    await admin.mutation(api.present.addClockMinute, { sessionId });
+
+    vi.setSystemTime(T0 + 200_000);
+    await admin.mutation(api.present.setCurrentIndex, { sessionId, index: 2 });
+
+    const session = await sessionState(admin);
+    expect(session.clockStartedAt).toBeUndefined();
+    expect(session.clockElapsedMs).toBeUndefined();
+    expect(session.bonusPresentationMs).toBeUndefined();
+    expect(session.currentStartedAt).toBeUndefined();
+  });
+
+  it("clears the clock when the presenter is removed, and when setup reopens", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId, ids } = await midSession(t);
+    const [aiden, janelle] = ids;
+    await admin.mutation(api.present.startClock, { sessionId });
+
+    // A removal above the presenter leaves Janelle's own clock running.
+    await admin.mutation(api.present.removeSignup, { id: aiden });
+    expect((await sessionState(admin)).clockStartedAt).toBe(T0);
+
+    // Removing her hands the stage to Hesham, whose slot has not begun.
+    await admin.mutation(api.present.removeSignup, { id: janelle });
+    expect((await sessionState(admin)).clockStartedAt).toBeUndefined();
+
+    await admin.mutation(api.present.startClock, { sessionId });
+    await admin.mutation(api.present.setStatus, { sessionId, status: "collecting" });
+    expect((await sessionState(admin)).clockStartedAt).toBeUndefined();
+  });
+
+  it("refuses to run a clock on a session that is not presenting", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, member, sessionId, code } = await startSession(t);
+    await t.mutation(api.present.join, { code, name: "Aiden" });
+
+    // Still collecting names: there is nobody on stage to time.
+    await expect(admin.mutation(api.present.startClock, { sessionId })).rejects.toThrow(
+      "Talks are not under way",
+    );
+    await expect(admin.mutation(api.present.addClockMinute, { sessionId })).rejects.toThrow(
+      "Talks are not under way",
+    );
+
+    await admin.mutation(api.present.setStatus, { sessionId, status: "locked" });
+    for (const clockMutation of [
+      api.present.startClock,
+      api.present.pauseClock,
+      api.present.resetClock,
+      api.present.addClockMinute,
+      api.present.skipToFeedback,
+    ]) {
+      await expect(member.mutation(clockMutation, { sessionId })).rejects.toThrow(
+        "Admin access required",
+      );
+    }
+  });
+});
+
+describe("present clock — on the attendees' phones", () => {
+  const T0 = new Date("2026-10-01T10:00:00.000Z").getTime();
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(T0);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("hands every phone the same clock the admin devices read", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId, code, ids } = await midSession(t);
+    const [, janelle, hesham] = ids;
+
+    await admin.mutation(api.present.startClock, { sessionId });
+    vi.setSystemTime(T0 + 30_000);
+    await admin.mutation(api.present.addClockMinute, { sessionId });
+
+    const expected = {
+      presentationMinutes: 3,
+      feedbackMinutes: 2,
+      clockStartedAt: T0,
+      clockElapsedMs: undefined,
+      bonusPresentationMs: 60_000,
+      bonusFeedbackMs: undefined,
+    };
+    // The person on stage and someone waiting see one and the same clock.
+    expect((await t.query(api.present.myPlace, { code, signupId: janelle }))!.clock).toEqual(
+      expected,
+    );
+    expect((await t.query(api.present.myPlace, { code, signupId: hesham }))!.clock).toEqual(
+      expected,
+    );
+
+    // A pause reaches the phones too, as the figure it banked.
+    vi.setSystemTime(T0 + 45_000);
+    await admin.mutation(api.present.pauseClock, { sessionId });
+    const paused = (await t.query(api.present.myPlace, { code, signupId: hesham }))!.clock!;
+    expect(paused.clockStartedAt).toBeUndefined();
+    expect(paused.clockElapsedMs).toBe(45_000);
+  });
+
+  it("shows no clock while nobody is on stage", async () => {
+    const t = convexTest(schema, modules);
+    const { admin, sessionId, code } = await startSession(t);
+    const aiden = await t.mutation(api.present.join, { code, name: "Aiden" });
+
+    // Still collecting names.
+    expect((await t.query(api.present.myPlace, { code, signupId: aiden }))!.clock).toBeNull();
+
+    // The last presenter removed: the pointer sits one past the end.
+    await admin.mutation(api.present.setStatus, { sessionId, status: "locked" });
+    const latecomer = await t.mutation(api.present.join, { code, name: "Latecomer" });
+    await admin.mutation(api.present.setCurrentIndex, { sessionId, index: 1 });
+    await admin.mutation(api.present.removeSignup, { id: latecomer });
+    expect((await t.query(api.present.myPlace, { code, signupId: aiden }))!.clock).toBeNull();
+  });
+
+  it("tells an anonymous phone the server's time, to correct its own clock by", async () => {
+    const t = convexTest(schema, modules);
+    expect(await t.mutation(api.present.serverTime, {})).toBe(T0);
   });
 });

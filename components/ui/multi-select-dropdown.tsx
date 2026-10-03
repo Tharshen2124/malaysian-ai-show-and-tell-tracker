@@ -1,6 +1,8 @@
 "use client";
 
 import { Check, ChevronsUpDown, Search, X } from "lucide-react";
+import { buttonVariants } from "./button";
+import { cn } from "@/lib/utils";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DropdownOption } from "./searchable-dropdown";
 
@@ -75,16 +77,20 @@ export function MultiSelectDropdown({
           setOpen((o) => !o);
           setHighlight(0);
         }}
-        className="field-input flex min-h-11 items-center justify-between gap-2 text-left"
+        aria-expanded={open}
+        className={cn(
+          buttonVariants({ variant: "outline" }),
+          "h-auto min-h-11 w-full justify-between gap-2 px-3 py-2 text-left font-normal",
+        )}
       >
         {chips.length === 0 ? (
-          <span className="text-faint">{placeholder}</span>
+          <span className="text-muted-foreground">{placeholder}</span>
         ) : (
           <span className="flex flex-wrap gap-1.5">
             {chips.map((chip) => (
               <span
                 key={chip.value}
-                className="inline-flex items-center gap-1 rounded-full border border-hairline bg-recessed px-2 py-0.5 text-xs"
+                className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-xs"
               >
                 {chip.label}
                 <span
@@ -101,7 +107,7 @@ export function MultiSelectDropdown({
                       toggleValue(chip.value);
                     }
                   }}
-                  className="rounded-full p-0.5 hover:bg-hairline"
+                  className="rounded-full p-0.5 hover:bg-border"
                 >
                   <X className="h-3 w-3" />
                 </span>
@@ -109,24 +115,26 @@ export function MultiSelectDropdown({
             ))}
           </span>
         )}
-        <ChevronsUpDown className="h-4 w-4 shrink-0 text-faint" />
+        <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" />
       </button>
 
       {open && (
-        <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-media border border-hairline bg-card-raised shadow-float">
-          <div className="flex items-center gap-2 border-b border-hairline px-3 py-2">
-            <Search className="h-4 w-4 text-faint" />
+        <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-lg border border-border bg-popover shadow-lg">
+          <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+            <Search className="h-4 w-4 text-muted-foreground" />
             <input
               ref={searchRef}
               value={filter}
               onChange={(e) => setFilterAndResetHighlight(e.target.value)}
               onKeyDown={onKeyDown}
               placeholder="Filter…"
-              className="w-full bg-transparent text-sm outline-none placeholder:text-faint"
+              className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
           </div>
           <div className="max-h-56 overflow-y-auto py-1">
-            {filtered.length === 0 && <p className="px-3 py-3 text-sm text-faint">No matches.</p>}
+            {filtered.length === 0 && (
+              <p className="px-3 py-3 text-sm text-muted-foreground">No matches.</p>
+            )}
             {filtered.map((option, index) => (
               <button
                 key={option.value}
@@ -134,7 +142,7 @@ export function MultiSelectDropdown({
                 onClick={() => toggleValue(option.value)}
                 onMouseEnter={() => setHighlight(index)}
                 className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm ${
-                  index === highlight ? "bg-recessed" : ""
+                  index === highlight ? "bg-muted" : ""
                 }`}
               >
                 {option.label}

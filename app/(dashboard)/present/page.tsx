@@ -1,20 +1,89 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
+import type { OptimisticLocalStore } from "convex/browser";
+import type { FunctionReturnType } from "convex/server";
 import { Play, QrCode } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { minutesToSeconds, secondsToMinutes } from "@/lib/clock";
 import { useAccess } from "@/lib/use-access";
+import { serverNow } from "@/lib/use-server-offset";
 import { useToast } from "@/components/providers/toast-provider";
+import { ClockField } from "@/components/present/clock-field";
 import { QrPanel } from "@/components/present/qr-panel";
 import { RosterList } from "@/components/present/roster-list";
+import { Card } from "@/components/ui/card";
 import { PresenterTimer } from "@/components/present/presenter-timer";
-import { buttonClass } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 
 const DEFAULT_PRESENTATION_MINUTES = 3;
 const DEFAULT_FEEDBACK_MINUTES = 2;
+
+/*
+ * Start, pause and reset answer a tap on a clock the whole room is watching, so
+ * they move it before the round trip rather than after it. The server's own
+ * timestamps land a moment later and win — within the latency of one mutation,
+ * so the figure does not visibly jump. The guesses are stamped on server time
+ * (`serverNow`), so a device whose own clock is off does not make that jump any
+ * bigger. Each mirrors its mutation in `convex/present.ts`, including declining
+ * to restart a clock that is already running, so the two cannot disagree while
+ * the write is in flight.
+ *
+ * Granting a minute and skipping to feedback are deliberately left to the
+ * server: both turn on which phase is running, and that is a judgement only one
+ * of the room's devices should be making.
+ */
+function patchSession(
+  localStore: OptimisticLocalStore,
+  patch: (session: NonNullable<ActiveSession>) => Partial<NonNullable<ActiveSession>> | null,
+) {
+  const current = localStore.getQuery(api.present.activeSession, {});
+  if (!current) return;
+  const next = patch(current);
+  if (next) localStore.setQuery(api.present.activeSession, {}, { ...current, ...next });
+}
+
+type ActiveSession = FunctionReturnType<typeof api.present.activeSession>;
+
+const startedClock = (localStore: OptimisticLocalStore) =>
+  patchSession(localStore, (session) => {
+    if (session.clockStartedAt !== undefined) return null;
+    const now = serverNow();
+    return {
+      clockStartedAt: now - (session.clockElapsedMs ?? 0),
+      // Starting the clock is also what pins the presenter against a reorder.
+      currentStartedAt: session.currentStartedAt ?? now,
+    };
+  });
+
+const pausedClock = (localStore: OptimisticLocalStore) =>
+  patchSession(localStore, (session) =>
+    session.clockStartedAt === undefined
+      ? null
+      : {
+          clockStartedAt: undefined,
+          clockElapsedMs: Math.max(0, serverNow() - session.clockStartedAt),
+        },
+  );
+
+const clearedClock = (localStore: OptimisticLocalStore) =>
+  patchSession(localStore, () => ({
+    clockStartedAt: undefined,
+    clockElapsedMs: undefined,
+    bonusPresentationMs: undefined,
+    bonusFeedbackMs: undefined,
+  }));
+
+/** Rejections from `insertSignup` worth repeating to the admin verbatim;
+ *  anything else is a bug or an outage and gets the generic line. */
+const ADD_REJECTIONS = [
+  "That name is already on the list",
+  "This session is full",
+  "Sign-ups are closed",
+];
 
 export default function PresentPage() {
   const router = useRouter();
@@ -23,11 +92,13 @@ export default function PresentPage() {
 
   const session = useQuery(api.present.activeSession, isAdmin ? {} : "skip");
   const createSession = useMutation(api.present.createSession);
+  const addSignup = useMutation(api.present.addSignup);
   const removeSignup = useMutation(api.present.removeSignup);
   const setStatus = useMutation(api.present.setStatus);
   const setCurrentIndex = useMutation(api.present.setCurrentIndex);
-  const markCurrentStarted = useMutation(api.present.markCurrentStarted);
   const updateDurations = useMutation(api.present.updateDurations);
+  const addClockMinute = useMutation(api.present.addClockMinute);
+  const skipToFeedback = useMutation(api.present.skipToFeedback);
 
   // Dragging a row must move it now, not after a round trip, or it snaps back
   // under the cursor. Convex reconciles this against the server's answer.
@@ -42,6 +113,10 @@ export default function PresentPage() {
     localStore.setQuery(api.present.activeSession, {}, { ...current, signups });
   });
 
+  const startClock = useMutation(api.present.startClock).withOptimisticUpdate(startedClock);
+  const pauseClock = useMutation(api.present.pauseClock).withOptimisticUpdate(pausedClock);
+  const resetClock = useMutation(api.present.resetClock).withOptimisticUpdate(clearedClock);
+
   // Only admins run the room; members get sent back rather than shown a
   // half-working console.
   useEffect(() => {
@@ -52,8 +127,8 @@ export default function PresentPage() {
 
   const heading = (
     <div>
-      <h1 className="page-title">So, who presents first?</h1>
-      <p className="mt-3 text-sm text-soft">
+      <h1 className="text-3xl tracking-tight">So, who presents first?</h1>
+      <p className="mt-3 text-sm text-muted-foreground">
         Put the QR code on the screen, let people scan in, set the order, then run the clock. The
         code stays up during the talks for anyone who turns up late.
       </p>
@@ -75,7 +150,7 @@ export default function PresentPage() {
     return (
       <div className="space-y-8">
         {heading}
-        <div className="h-64 animate-pulse rounded-panel bg-recessed" />
+        <div className="h-64 animate-pulse rounded-xl bg-muted" />
       </div>
     );
   }
@@ -84,15 +159,19 @@ export default function PresentPage() {
     return (
       <div className="space-y-8">
         {heading}
-        <div className="flex flex-col items-center gap-4 rounded-panel border-[1.5px] border-dashed border-hairline px-6 py-16 text-center">
-          <QrCode className="h-9 w-9 text-faint" />
-          <p className="max-w-sm text-sm text-muted">
+        <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-border px-6 py-16 text-center">
+          <QrCode className="h-9 w-9 text-muted-foreground" />
+          <p className="max-w-sm text-sm text-muted-foreground">
             Start a session to put a QR code on the screen. Everyone in the room scans it and adds
             their own name.
           </p>
-          <button onClick={start} className={buttonClass("primary", { lift: true })}>
+          <Button
+            onClick={start}
+            variant="default"
+            className="hover:-translate-y-0.5 focus-visible:-translate-y-0.5"
+          >
             Start a session
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -117,15 +196,31 @@ export default function PresentPage() {
     }
   };
 
+  /** Shared by every clock control: a failure is a toast, never a thrown tap. */
+  const clockAction = (run: () => Promise<unknown>) => () => {
+    run().catch((e: unknown) => {
+      // The one rejection that is not a connection problem: another admin
+      // device took the session back to setup while this one was still timing.
+      const raw = e instanceof Error ? e.message : "";
+      toast.error(
+        raw.includes("Talks are not under way")
+          ? "The talks aren't running any more — someone went back to setup."
+          : "Could not reach the clock. Check the connection and try again.",
+      );
+    });
+  };
+
   // One tree for both phases, so the QR code stays put, without a flicker, when
   // the talks start.
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       {!presenting && heading}
 
-      <div className="grid gap-8 lg:grid-cols-2">
-        {/* Below the clock on a narrow screen, where the clock is what the admin needs. */}
-        <div className={presenting ? "max-lg:order-last" : undefined}>
+      <div className="grid gap-6 sm:gap-8 lg:grid-cols-2">
+        {/* Below the controls on a narrow screen, where the clock and the order
+            are what the admin needs; during setup only on a phone, since a
+            tablet still has room to show the code first. */}
+        <div className={presenting ? "max-lg:order-last" : "max-sm:order-last"}>
           <QrPanel code={session.code} />
         </div>
 
@@ -144,15 +239,12 @@ export default function PresentPage() {
                   toast.error("Could not move to the next presenter.");
                 }
               }}
-              started={currentStarted}
-              onStart={async () => {
-                try {
-                  await markCurrentStarted({ sessionId: session._id });
-                } catch {
-                  // The clock is running locally either way; all this misses is
-                  // pinning the presenter against a reorder.
-                }
-              }}
+              clock={session}
+              onStart={clockAction(() => startClock({ sessionId: session._id }))}
+              onPause={clockAction(() => pauseClock({ sessionId: session._id }))}
+              onReset={clockAction(() => resetClock({ sessionId: session._id }))}
+              onAddMinute={clockAction(() => addClockMinute({ sessionId: session._id }))}
+              onSkipToFeedback={clockAction(() => skipToFeedback({ sessionId: session._id }))}
               presentationMinutes={session.presentationMinutes}
               feedbackMinutes={session.feedbackMinutes}
               onReopen={async () => {
@@ -191,20 +283,33 @@ export default function PresentPage() {
                 toast.error("Could not remove that name.");
               }
             }}
+            onAdd={async (name) => {
+              try {
+                await addSignup({ sessionId: session._id, name });
+                return true;
+              } catch (e) {
+                // Convex wraps a thrown message in request-id and stack noise,
+                // so the known rejections are matched out of it.
+                const raw = e instanceof Error ? e.message : "";
+                toast.error(
+                  ADD_REJECTIONS.find((m) => raw.includes(m)) ?? "Could not add that name.",
+                );
+                return false;
+              }
+            }}
           />
 
           {!presenting && (
             <>
-              <DurationFields
-                key={`${session.presentationMinutes}-${session.feedbackMinutes}`}
-                presentationMinutes={session.presentationMinutes}
-                feedbackMinutes={session.feedbackMinutes}
-                onCommit={async (presentation, feedbackMinutes) => {
+              <DurationSetter
+                presentationSeconds={minutesToSeconds(session.presentationMinutes)}
+                feedbackSeconds={minutesToSeconds(session.feedbackMinutes)}
+                onCommit={async (presentation, feedback) => {
                   try {
                     await updateDurations({
                       sessionId: session._id,
-                      presentationMinutes: presentation,
-                      feedbackMinutes,
+                      presentationMinutes: secondsToMinutes(presentation),
+                      feedbackMinutes: secondsToMinutes(feedback),
                     });
                   } catch {
                     toast.error("Could not save the timings.");
@@ -212,14 +317,15 @@ export default function PresentPage() {
                 }}
               />
 
-              <button
+              <Button
                 onClick={beginTalks}
                 disabled={session.signups.length === 0}
-                className={`${buttonClass("primary")} w-full py-3`}
+                variant="default"
+                className="w-full py-3"
               >
                 <Play className="h-4 w-4" />
                 Start presentations
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -228,69 +334,39 @@ export default function PresentPage() {
   );
 }
 
-function DurationFields({
-  presentationMinutes,
-  feedbackMinutes,
+/**
+ * The two slot lengths, set in the same mm:ss the running clock is read in —
+ * big enough to be the obvious thing to adjust before pressing Start, which
+ * two small "min" boxes never were.
+ */
+function DurationSetter({
+  presentationSeconds,
+  feedbackSeconds,
   onCommit,
 }: {
-  presentationMinutes: number;
-  feedbackMinutes: number;
-  onCommit: (presentation: number, feedback: number) => void;
+  presentationSeconds: number;
+  feedbackSeconds: number;
+  onCommit: (presentationSeconds: number, feedbackSeconds: number) => void;
 }) {
-  // Seeded once per mount. The parent keys this component on the saved values,
-  // so a change from another admin's tab remounts it with the new numbers
-  // rather than fighting a half-typed edit.
-  const [presentation, setPresentation] = useState(String(presentationMinutes));
-  const [feedback, setFeedback] = useState(String(feedbackMinutes));
-
-  // Committed on blur rather than per keystroke, so half-typed numbers never
-  // reach the server.
-  const commit = () => {
-    const p = Number(presentation);
-    const f = Number(feedback);
-    if (!Number.isFinite(p) || p <= 0 || !Number.isFinite(f) || f <= 0) {
-      setPresentation(String(presentationMinutes));
-      setFeedback(String(feedbackMinutes));
-      return;
-    }
-    if (p === presentationMinutes && f === feedbackMinutes) return;
-    onCommit(p, f);
-  };
-
-  const field = "field-input w-20 text-center";
-
   return (
-    <div className="card-surface p-4">
-      <h2 className="kicker mb-3">Time per person</h2>
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-3 text-sm">
-        <label className="flex items-center gap-2">
-          <input
-            type="number"
-            min={1}
-            max={120}
-            value={presentation}
-            onChange={(e) => setPresentation(e.target.value)}
-            onBlur={commit}
-            className={field}
-          />
-          <span className="text-muted">min presentation</span>
-        </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="number"
-            min={1}
-            max={120}
-            value={feedback}
-            onChange={(e) => setFeedback(e.target.value)}
-            onBlur={commit}
-            className={field}
-          />
-          <span className="text-muted">min feedback</span>
-        </label>
+    <Card className="gap-0 p-4">
+      <h2 className="mb-3 text-xs font-medium text-muted-foreground">Time per person</h2>
+      <div className="flex gap-3">
+        <ClockField
+          label="Presentation"
+          seconds={presentationSeconds}
+          onCommit={(seconds) => onCommit(seconds, feedbackSeconds)}
+        />
+        <ClockField
+          label="Feedback"
+          seconds={feedbackSeconds}
+          onCommit={(seconds) => onCommit(presentationSeconds, seconds)}
+        />
       </div>
-      <p className="mt-2 text-xs text-faint">
-        One chime hands over to feedback; three lower ones end the slot.
+      <p className="mt-3 text-xs text-muted-foreground">
+        Minutes and seconds — type 3 0 0 for three minutes. One chime hands over to feedback; three
+        lower ones end the slot.
       </p>
-    </div>
+    </Card>
   );
 }
