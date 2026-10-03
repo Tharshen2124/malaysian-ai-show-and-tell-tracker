@@ -5,8 +5,11 @@ import { useMutation, useQuery } from "convex/react";
 import { Loader2, Lock } from "lucide-react";
 import { z } from "zod";
 import { api } from "@/convex/_generated/api";
-import { ErrorState, InlineErrorBanner } from "@/components/ui/error-state-legacy";
-import { SubmitButton } from "@/components/ui/submit-button-legacy";
+import { ErrorState, InlineErrorBanner } from "@/components/ui/error-state";
+import { SubmitButton } from "@/components/ui/submit-button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Field } from "@/components/forms/field";
 import { Wordmark } from "@/components/ui/wordmark";
 import { AttendeePlace } from "@/components/present/attendee-place";
 import { useChime } from "@/lib/use-chime";
@@ -140,12 +143,12 @@ export default function JoinPage({ params }: PageProps<"/join/[code]">) {
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 py-10">
       <div className="mb-8 text-center">
         <Wordmark />
-        <h1 className="page-title mt-4">Who presents first?</h1>
+        <h1 className="mt-5 text-[2rem]">Who presents first?</h1>
       </div>
 
       {loading && (
-        <p className="flex items-center justify-center gap-2 text-sm text-ink-muted">
-          <Loader2 className="h-4 w-4 animate-spin" />
+        <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
           Checking the session…
         </p>
       )}
@@ -157,41 +160,43 @@ export default function JoinPage({ params }: PageProps<"/join/[code]">) {
       {!loading && session && place && <AttendeePlace place={place} />}
 
       {!loading && session && !place && session.status === "done" && (
-        <div className="card-surface flex flex-col items-center gap-3 px-6 py-12 text-center">
-          <Lock className="h-8 w-8 text-faint" />
-          <p className="text-sm text-ink-muted">
+        <Card className="items-center gap-3 px-6 py-12 text-center">
+          <Lock className="size-8 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">
             Sign-ups are closed — this session has wrapped up. Have a word with an organiser if you
             still want a slot.
           </p>
-        </div>
+        </Card>
       )}
 
       {/* Still open once talks have started: latecomers join the back of the queue. */}
       {!loading && session && !place && session.status !== "done" && (
-        <form onSubmit={submit} className="space-y-4">
-          {error && <InlineErrorBanner message={error} />}
-          <label className="block">
-            <span className="mb-1.5 block text-sm text-ink-muted">Your name</span>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              // Sized and hinted for a phone held one-handed in a dim room.
-              autoFocus
-              autoCapitalize="words"
-              autoComplete="name"
-              enterKeyHint="done"
-              maxLength={60}
-              placeholder="e.g. Aiden"
-              className="field-input min-h-13 px-4 text-lg"
-            />
-          </label>
-          <SubmitButton pending={pending} className="min-h-13 w-full text-base">
-            Add me to the list
-          </SubmitButton>
-          <p className="text-center text-xs text-faint">
-            {session.signupCount} {session.signupCount === 1 ? "person is" : "people are"} in so far.
-          </p>
-        </form>
+        <Card className="gap-0 p-5 sm:p-6">
+          <form onSubmit={submit} className="grid gap-4">
+            {error && <InlineErrorBanner message={error} />}
+            <Field label="Your name">
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                // Sized and hinted for a phone held one-handed in a dim room.
+                autoFocus
+                autoCapitalize="words"
+                autoComplete="name"
+                enterKeyHint="done"
+                maxLength={60}
+                placeholder="e.g. Aiden"
+                className="h-12 text-lg md:text-lg"
+              />
+            </Field>
+            <SubmitButton pending={pending} className="h-12 w-full text-base">
+              Add me to the list
+            </SubmitButton>
+            <p className="text-center text-xs text-muted-foreground">
+              {session.signupCount} {session.signupCount === 1 ? "person is" : "people are"} in so
+              far.
+            </p>
+          </form>
+        </Card>
       )}
     </main>
   );

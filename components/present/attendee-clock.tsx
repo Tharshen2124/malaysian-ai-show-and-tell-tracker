@@ -1,6 +1,7 @@
 "use client";
 
 import { formatClock } from "@/lib/clock";
+import { cn } from "@/lib/utils";
 import { SharedClock, usePresenterTimer } from "@/lib/use-presenter-timer";
 
 /** The slot clock as `present.myPlace` hands it to a phone. */
@@ -35,32 +36,39 @@ export function AttendeeClock({
     ? "border-danger-line bg-danger-soft"
     : feedback
       ? "border-info-line bg-info-soft"
-      : "border-hairline bg-paper";
+      : "border-border bg-card shadow-card";
 
   const status = notStarted ? "Not started" : timer.running ? null : "Paused";
 
   return (
     <section
       aria-label="Time left"
-      className={`flex flex-col items-center gap-2 rounded-panel border-[1.5px] px-6 py-6 text-center transition-colors duration-300 ${tone}`}
+      className={cn(
+        "flex flex-col items-center gap-2 rounded-2xl border px-6 py-6 text-center transition-colors duration-300",
+        tone,
+      )}
     >
-      <p className="kicker">
-        {isYou ? "Your time" : <span className="normal-case tracking-normal">{presenterName}</span>}
+      <p className="text-[0.8125rem] leading-snug font-semibold text-muted-foreground">
+        {isYou ? "Your time" : presenterName}
       </p>
 
+      {/* platform-design.md's badge: a pill on the tint, or on the accent's selection wash. */}
       <p
-        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs tabular-nums ${
-          feedback ? "border-info-line text-info" : "border-hairline text-ink-muted"
-        }`}
+        className={cn(
+          "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums",
+          feedback ? "bg-selection text-info" : "bg-secondary text-muted-foreground",
+        )}
       >
         {feedback ? "Feedback" : "Presentation"} · {formatClock(timer.phaseSeconds)}
-        {status && <span className="text-faint">· {status}</span>}
+        {status && <span className="font-normal opacity-75">· {status}</span>}
       </p>
 
       <p
-        className={`display-figure leading-none ${
-          isYou ? "text-[clamp(4.5rem,26vw,7rem)]" : "text-[clamp(3rem,16vw,4.5rem)]"
-        } ${timer.overrun ? "text-danger" : "text-heading"}`}
+        className={cn(
+          "leading-none font-bold tracking-[-0.02em] tabular-nums",
+          isYou ? "text-[clamp(4.5rem,26vw,7rem)]" : "text-[clamp(3rem,16vw,4.5rem)]",
+          timer.overrun ? "text-danger" : "text-foreground",
+        )}
       >
         {formatClock(timer.secondsLeft)}
       </p>

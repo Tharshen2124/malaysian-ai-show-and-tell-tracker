@@ -8,7 +8,7 @@ interface SubmitButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   pending: boolean;
 }
 
-/** Dashboard submit. app/join still uses submit-button-legacy.tsx. */
+/** The submit button for the dashboard and app/join. */
 export function SubmitButton({ pending, children, className, ...rest }: SubmitButtonProps) {
   return (
     <Button type="submit" disabled={pending || rest.disabled} className={className} {...rest}>
