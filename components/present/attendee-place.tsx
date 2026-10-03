@@ -195,10 +195,10 @@ function StatusCard({ place }: { place: Place }) {
 }
 
 const TONES = {
-  calm: "border-hairline bg-card text-ink",
+  calm: "border-hairline bg-paper text-ink",
   warn: "border-warn-line bg-warn-soft text-warn",
   accent: "border-success-line bg-success-soft text-success",
-  done: "border-hairline bg-card text-muted",
+  done: "border-hairline bg-paper text-ink-muted",
 };
 
 function Card({

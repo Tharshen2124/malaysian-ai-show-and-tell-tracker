@@ -4,17 +4,20 @@ import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
-import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useIsAdmin } from "@/lib/use-access";
 import { useToast } from "@/components/providers/toast-provider";
+import { BackLink } from "@/components/ui/back-link";
+import { DetailPageSkeleton } from "@/components/ui/skeletons";
 import { StatusPill } from "@/components/ui/status-pill";
 import { NullTextIndicator } from "@/components/ui/null-text-indicator";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Card } from "@/components/ui/card";
 import { UpdateAdminActions } from "@/components/cards/update-admin-actions";
 import { ErrorState } from "@/components/ui/error-state";
-import { buttonClass } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { PROJECT_CATEGORY_LABELS } from "@/lib/labels";
 import { formatDate } from "@/lib/format";
 
@@ -33,45 +36,40 @@ export default function MemberDetailPage({ params }: PageProps<"/members/[id]">)
 
   return (
     <div className="space-y-8">
-      <Link
-        href="/members"
-        className="inline-flex items-center gap-1.5 text-[0.82rem] text-muted transition-colors hover:text-ink"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        All members
-      </Link>
+      <BackLink href="/members">All members</BackLink>
 
       {member === undefined ? (
-        <div className="space-y-4">
-          <div className="h-10 w-64 animate-pulse rounded-[0.3rem] bg-recessed" />
-          <div className="h-32 animate-pulse rounded-panel bg-recessed" />
-        </div>
+        <DetailPageSkeleton />
       ) : (
         <>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex flex-wrap items-center gap-3">
-                <h1 className="page-title">{member.name}</h1>
+                <h1 className="text-3xl tracking-tight">{member.name}</h1>
                 <StatusPill isActive={member.isActive} />
               </div>
-              <p className="mt-3 text-sm text-muted">{member.email}</p>
-              <p className="mt-1 text-sm text-faint">
+              <p className="mt-3 text-sm text-muted-foreground">{member.email}</p>
+              <p className="mt-1 text-sm text-muted-foreground">
                 Registered {formatDate(member.registerDate)}
               </p>
             </div>
             {isAdmin && (
               <div className="flex gap-2">
-                <Link href={`/members/${member._id}/edit`} className={buttonClass("outline")}>
+                <Link
+                  href={`/members/${member._id}/edit`}
+                  className={buttonVariants({ variant: "outline" })}
+                >
                   <Pencil className="h-4 w-4" />
                   Edit
                 </Link>
-                <button
+                <Button
                   onClick={() => setConfirmingDelete(true)}
-                  className={buttonClass("danger-outline")}
+                  variant="outline"
+                  className="border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive"
                 >
                   <Trash2 className="h-4 w-4" />
                   Delete
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -88,35 +86,37 @@ export default function MemberDetailPage({ params }: PageProps<"/members/[id]">)
               },
               { label: "Meetups since last talk", value: member.meetupsSinceLastTalk },
             ].map((metric) => (
-              <div key={metric.label} className="card-surface p-4">
-                <p className="text-xs text-muted">{metric.label}</p>
-                <p className="display-figure mt-2 text-[1.9rem] leading-none text-heading">
+              <Card key={metric.label} className="gap-0 p-4">
+                <p className="text-xs text-muted-foreground">{metric.label}</p>
+                <p className="mt-2 text-2xl leading-none font-semibold tracking-tight tabular-nums">
                   {metric.value}
                 </p>
-              </div>
+              </Card>
             ))}
           </div>
 
           {/* Projects with update history */}
           <section className="space-y-4">
-            <h2 className="section-title">Projects</h2>
+            <h2 className="text-xl font-semibold tracking-tight">Projects</h2>
             {member.projects.length === 0 && (
-              <p className="text-sm text-faint">No projects yet.</p>
+              <p className="text-sm text-muted-foreground">No projects yet.</p>
             )}
             {member.projects.map((project) => (
-              <div key={project._id} className="card-surface p-5">
+              <Card key={project._id} className="gap-0 p-5">
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <h3 className="text-[1.25rem]">{project.name}</h3>
-                  <span className="text-xs text-faint">
+                  <h3 className="text-base font-semibold">{project.name}</h3>
+                  <span className="text-xs text-muted-foreground">
                     {PROJECT_CATEGORY_LABELS[project.category]}
                     {project.completed ? " · Completed" : ""} ·{" "}
                     {project.members.map((m) => m.name).join(", ")}
                   </span>
                 </div>
                 {project.updates.length === 0 ? (
-                  <p className="mt-3 text-sm text-faint">No talks recorded for this project.</p>
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    No talks recorded for this project.
+                  </p>
                 ) : (
-                  <ul className="mt-4 space-y-3 border-t border-hairline pt-4">
+                  <ul className="mt-4 space-y-3 border-t border-border pt-4">
                     {project.updates.map((u) => (
                       <li key={u._id} className="text-sm">
                         <div className="flex items-start justify-between gap-2">
@@ -127,7 +127,7 @@ export default function MemberDetailPage({ params }: PageProps<"/members/[id]">)
                             >
                               Meetup #{u.meetupNumber}
                             </Link>
-                            <span className="text-faint">
+                            <span className="text-muted-foreground">
                               {" "}
                               · {formatDate(u.meetupDate)} · by {u.memberName}
                             </span>
@@ -144,12 +144,12 @@ export default function MemberDetailPage({ params }: PageProps<"/members/[id]">)
                             />
                           )}
                         </div>
-                        <p className="mt-0.5 text-soft">{u.description}</p>
+                        <p className="mt-0.5 text-muted-foreground">{u.description}</p>
                       </li>
                     ))}
                   </ul>
                 )}
-              </div>
+              </Card>
             ))}
           </section>
 

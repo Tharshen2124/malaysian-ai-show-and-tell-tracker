@@ -8,6 +8,7 @@ import { MemberCard } from "@/components/cards/member-card";
 import { MeetupCard } from "@/components/cards/meetup-card";
 import { CardGridSkeleton, StatSkeleton } from "@/components/ui/skeletons";
 import { EmptyState } from "@/components/ui/error-state";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 
 /** Three across, so each section stays one row and the page ends above the fold. */
 const CARD_GRID = "grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3";
@@ -24,10 +25,10 @@ function Section({
   return (
     <section>
       <div className="mb-4 flex items-baseline justify-between">
-        <h2 className="section-title">{title}</h2>
+        <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
         <Link
           href={viewAllHref}
-          className="text-[0.82rem] text-soft underline underline-offset-[0.22em] transition-colors hover:text-ink"
+          className="text-sm text-muted-foreground underline underline-offset-[0.22em] transition-colors hover:text-foreground"
         >
           View All
         </Link>
@@ -50,22 +51,30 @@ export default function DashboardPage() {
     : null;
 
   return (
-    <div className="flat-cards space-y-10">
+    <div className="space-y-10">
       {/* The page opens on the admin actions; everything below it is reference. */}
       <AdminControlPanel />
 
-      {/* Counts read as a plain figure strip — a card per number earned nothing. */}
-      <div className="flex flex-wrap gap-x-10 gap-y-5 border-y border-hairline py-5">
+      {/* The counts, as shadcn's stat-card row. */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {stats
           ? stats.map((stat) => (
-              <div key={stat.label}>
-                <p className="kicker">{stat.label}</p>
-                <p className="display-figure mt-1 text-[2rem] leading-none text-heading">
-                  {stat.value}
-                </p>
-              </div>
+              <Card key={stat.label} className="gap-2 py-4">
+                <CardHeader className="px-4">
+                  <CardDescription>{stat.label}</CardDescription>
+                </CardHeader>
+                <CardContent className="px-4">
+                  <p className="text-2xl font-semibold tabular-nums tracking-tight">{stat.value}</p>
+                </CardContent>
+              </Card>
             ))
-          : Array.from({ length: 4 }).map((_, i) => <StatSkeleton key={i} />)}
+          : Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i} className="gap-2 py-4">
+                <CardHeader className="px-4">
+                  <StatSkeleton />
+                </CardHeader>
+              </Card>
+            ))}
       </div>
 
       <Section title="Meetups" viewAllHref="/meetups">

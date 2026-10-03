@@ -9,8 +9,9 @@ import { useToast } from "@/components/providers/toast-provider";
 import { ModalLayout } from "@/components/ui/modal-layout";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { InlineErrorBanner } from "@/components/ui/error-state";
-import { buttonClass } from "@/components/ui/button";
-import { Field, inputClass } from "./field";
+import { Button } from "@/components/ui/button";
+import { Field } from "./field";
+import { Input } from "@/components/ui/input";
 import { todayISO } from "@/lib/format";
 
 const schema = z.object({
@@ -95,27 +96,21 @@ function MeetupFormFields({ initial, onClose }: { initial?: MeetupInitial; onClo
       {error && <InlineErrorBanner message={error} />}
       <div className="grid grid-cols-2 gap-3">
         <Field label="Number">
-          <input
+          <Input
             type="number"
             min={1}
             value={number}
             onChange={(e) => setNumberInput(e.target.value)}
-            className={inputClass}
           />
         </Field>
         <Field label="Date">
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className={inputClass}
-          />
+          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </Field>
       </div>
       <div className="flex justify-end gap-2 pt-2">
-        <button type="button" onClick={onClose} className={buttonClass("outline")}>
+        <Button type="button" onClick={onClose} variant="outline">
           Cancel
-        </button>
+        </Button>
         <SubmitButton pending={pending}>{initial ? "Save changes" : "Add meetup"}</SubmitButton>
       </div>
     </form>

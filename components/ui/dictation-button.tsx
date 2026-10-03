@@ -145,7 +145,7 @@ export function DictationButton({
   return (
     <div className="flex items-center gap-2">
       {recording && (
-        <span className="flex items-center gap-1.5 text-xs text-faint tabular-nums">
+        <span className="flex items-center gap-1.5 text-xs text-muted-foreground tabular-nums">
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-danger" />
           {formatElapsed(elapsed)}
         </span>
@@ -159,7 +159,7 @@ export function DictationButton({
         className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-55 max-sm:min-h-11 max-sm:px-3.5 ${
           recording
             ? "border-danger-line bg-danger-soft text-danger"
-            : "border-hairline text-muted hover:border-line hover:text-ink"
+            : "border-border text-muted-foreground hover:border-border-hover hover:text-foreground"
         }`}
       >
         {busy ? (

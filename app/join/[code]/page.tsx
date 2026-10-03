@@ -5,8 +5,8 @@ import { useMutation, useQuery } from "convex/react";
 import { Loader2, Lock } from "lucide-react";
 import { z } from "zod";
 import { api } from "@/convex/_generated/api";
-import { ErrorState, InlineErrorBanner } from "@/components/ui/error-state";
-import { SubmitButton } from "@/components/ui/submit-button";
+import { ErrorState, InlineErrorBanner } from "@/components/ui/error-state-legacy";
+import { SubmitButton } from "@/components/ui/submit-button-legacy";
 import { Wordmark } from "@/components/ui/wordmark";
 import { AttendeePlace } from "@/components/present/attendee-place";
 import { useChime } from "@/lib/use-chime";
@@ -144,7 +144,7 @@ export default function JoinPage({ params }: PageProps<"/join/[code]">) {
       </div>
 
       {loading && (
-        <p className="flex items-center justify-center gap-2 text-sm text-muted">
+        <p className="flex items-center justify-center gap-2 text-sm text-ink-muted">
           <Loader2 className="h-4 w-4 animate-spin" />
           Checking the session…
         </p>
@@ -159,7 +159,7 @@ export default function JoinPage({ params }: PageProps<"/join/[code]">) {
       {!loading && session && !place && session.status === "done" && (
         <div className="card-surface flex flex-col items-center gap-3 px-6 py-12 text-center">
           <Lock className="h-8 w-8 text-faint" />
-          <p className="text-sm text-muted">
+          <p className="text-sm text-ink-muted">
             Sign-ups are closed — this session has wrapped up. Have a word with an organiser if you
             still want a slot.
           </p>
@@ -171,7 +171,7 @@ export default function JoinPage({ params }: PageProps<"/join/[code]">) {
         <form onSubmit={submit} className="space-y-4">
           {error && <InlineErrorBanner message={error} />}
           <label className="block">
-            <span className="mb-1.5 block text-sm text-muted">Your name</span>
+            <span className="mb-1.5 block text-sm text-ink-muted">Your name</span>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}

@@ -76,13 +76,31 @@ export default defineSchema({
     presentationMinutes: v.number(),
     feedbackMinutes: v.number(),
     // Whose turn it is, as an index into the ordered roster. Shared so an
-    // attendee's phone can tell them they are next; the clock itself stays
-    // local to the admin's browser. Absent until the order is locked.
+    // attendee's phone can tell them they are next. Absent until the order is
+    // locked.
     currentIndex: v.optional(v.number()),
     // When the admin first started the clock on the current slot. Absent means
     // the person at `currentIndex` is up but has not begun, which is what lets
     // `present.reorder` still move them. Cleared whenever the turn pointer moves.
+    // One-way within a slot: pausing or resetting the clock does not unset it,
+    // because the person on stage has still had their turn begun.
     currentStartedAt: v.optional(v.number()),
+
+    // The clock for the current slot, kept here rather than in one browser so
+    // every admin device shows the same figure — the laptop driving the
+    // projector and the phone in the organiser's hand. The four fields below
+    // are a description of the clock, not a tick count: each device derives
+    // the elapsed figure from them against its own wall clock, so nothing
+    // drifts and a backgrounded tab is right again the moment it is reopened.
+    //
+    // Back-dated start instant: while running, elapsed = Date.now() - this.
+    // Absent means the clock is paused (or has not been started).
+    clockStartedAt: v.optional(v.number()),
+    // Elapsed ms banked by the last pause; the clock reads this while paused.
+    clockElapsedMs: v.optional(v.number()),
+    // "+1 minute", applied to whichever window was on screen at the time.
+    bonusPresentationMs: v.optional(v.number()),
+    bonusFeedbackMs: v.optional(v.number()),
     updatedAt: v.number(),
   })
     .index("by_code", ["code"])

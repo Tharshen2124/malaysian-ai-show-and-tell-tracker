@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useConvex } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { InlineErrorBanner } from "@/components/ui/error-state";
-import { SubmitButton } from "@/components/ui/submit-button";
+import { InlineErrorBanner } from "@/components/ui/error-state-legacy";
+import { SubmitButton } from "@/components/ui/submit-button-legacy";
 import { Wordmark } from "@/components/ui/wordmark";
 
 /** Keep in step with `CODE_LENGTH` in `convex/present.ts`. */
@@ -67,7 +67,7 @@ export default function JoinByCodePage() {
       <form onSubmit={submit} className="space-y-4">
         {error && <InlineErrorBanner message={error} />}
         <label className="block">
-          <span className="mb-1.5 block text-sm text-muted">Session code</span>
+          <span className="mb-1.5 block text-sm text-ink-muted">Session code</span>
           <input
             value={code}
             onChange={(e) => setCode(cleanCode(e.target.value))}

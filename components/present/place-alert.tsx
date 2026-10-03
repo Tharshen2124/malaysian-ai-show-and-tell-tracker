@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { Mic, Sparkles } from "lucide-react";
-import { buttonClass } from "@/components/ui/button";
+import { buttonClass } from "@/components/ui/button-legacy";
 
 /** The two moments worth interrupting someone's phone for. */
 export type AlertKind = "next" | "presenting";

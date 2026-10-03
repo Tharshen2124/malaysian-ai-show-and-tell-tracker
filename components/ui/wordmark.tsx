@@ -6,7 +6,7 @@
 export function Wordmark({ className = "" }: { className?: string }) {
   return (
     <span className={`font-pixel text-[clamp(1.35rem,1.8vw,1.7rem)] leading-none ${className}`}>
-      Show<span className="text-accent">&amp;</span>Tell
+      Show<span className="text-ink-accent">&amp;</span>Tell
     </span>
   );
 }

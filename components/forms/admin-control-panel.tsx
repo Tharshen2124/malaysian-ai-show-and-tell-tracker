@@ -11,9 +11,9 @@ import { UpdateFormModal } from "./update-form-modal";
 
 export function AdminControlPanel() {
   const isAdmin = useIsAdmin();
-  const [openModal, setOpenModal] = useState<
-    "meetup" | "member" | "project" | "update" | null
-  >(null);
+  const [openModal, setOpenModal] = useState<"meetup" | "member" | "project" | "update" | null>(
+    null,
+  );
 
   if (!isAdmin) return null;
 
@@ -31,9 +31,9 @@ export function AdminControlPanel() {
           <button
             key={key}
             onClick={() => setOpenModal(key)}
-            className="card-surface flex items-center gap-3 px-5 py-5 text-left transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-line"
+            className="rounded-xl border bg-card text-card-foreground shadow-sm flex items-center gap-3 px-5 py-5 text-left transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-border-hover"
           >
-            <Icon className="h-5 w-5 shrink-0 text-accent" />
+            <Icon className="h-5 w-5 shrink-0 text-muted-foreground" />
             <span>{label}</span>
           </button>
         ))}

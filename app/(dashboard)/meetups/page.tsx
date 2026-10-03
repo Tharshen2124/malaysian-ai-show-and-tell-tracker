@@ -7,9 +7,10 @@ import { api } from "@/convex/_generated/api";
 import { formatDate } from "@/lib/format";
 import { MeetupCard } from "@/components/cards/meetup-card";
 import { Pagination } from "@/components/ui/pagination";
+import { Input } from "@/components/ui/input";
 import { CardGridSkeleton } from "@/components/ui/skeletons";
 import { EmptyState } from "@/components/ui/error-state";
-import { buttonClass } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 
 /** Says which end of the range came up empty, rather than just "nothing found". */
 function emptyMessage(from: string, to: string): string {
@@ -36,35 +37,35 @@ export default function MeetupsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="page-title">Meetups</h1>
-        <p className="mt-3 text-sm text-soft">Every recorded meetup, newest first.</p>
+        <h1 className="text-3xl tracking-tight">Meetups</h1>
+        <p className="mt-3 text-sm text-muted-foreground">Every recorded meetup, newest first.</p>
       </div>
 
       {/* Date range — either end can be left open, so a rough guess still narrows. */}
       <div className="flex flex-wrap items-center gap-2">
-        <CalendarDays className="h-4 w-4 text-faint" />
-        <input
+        <CalendarDays className="h-4 w-4 text-muted-foreground" />
+        <Input
           type="date"
           aria-label="From date"
           value={from}
           max={to || undefined}
           onChange={(e) => setRange(e.target.value, to)}
-          className="field-input w-auto"
+          className="w-auto"
         />
-        <span className="text-sm text-faint">to</span>
-        <input
+        <span className="text-sm text-muted-foreground">to</span>
+        <Input
           type="date"
           aria-label="To date"
           value={to}
           min={from || undefined}
           onChange={(e) => setRange(from, e.target.value)}
-          className="field-input w-auto"
+          className="w-auto"
         />
         {(from || to) && (
-          <button onClick={() => setRange("", "")} className={buttonClass("ghost")}>
+          <Button onClick={() => setRange("", "")} variant="ghost">
             <X className="h-4 w-4" />
             Clear
-          </button>
+          </Button>
         )}
       </div>
 

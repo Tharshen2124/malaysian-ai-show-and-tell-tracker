@@ -1,20 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import { minutesToMs } from "./clock";
 import { useChime } from "./use-chime";
+import { useNow } from "./use-now";
 
 /** A slot is one talk followed by its feedback; each gets its own countdown. */
 export type TimerPhase = "presentation" | "feedback";
 
-const TICK_MS = 250;
-const MINUTE_MS = 60_000;
-
-export function formatClock(totalSeconds: number): string {
-  const negative = totalSeconds < 0;
-  const abs = Math.abs(totalSeconds);
-  const mm = String(Math.floor(abs / 60)).padStart(2, "0");
-  const ss = String(abs % 60).padStart(2, "0");
-  return `${negative ? "-" : ""}${mm}:${ss}`;
+/**
+ * The clock as the session row describes it. Every admin device gets the same
+ * four figures, which is what keeps the phone in the organiser's hand and the
+ * laptop on the projector showing the same time.
+ */
+export interface SharedClock {
+  /** Back-dated start instant; absent means paused. See `convex/schema.ts`. */
+  clockStartedAt?: number;
+  /** Elapsed ms banked by the last pause. */
+  clockElapsedMs?: number;
+  bonusPresentationMs?: number;
+  bonusFeedbackMs?: number;
 }
 
 export interface PresenterTimer {
@@ -24,125 +29,80 @@ export interface PresenterTimer {
   running: boolean;
   /** True once the feedback window has elapsed — the slot is over. */
   overrun: boolean;
-  toggle: () => void;
-  reset: () => void;
-  addMinute: () => void;
-  /** Skip straight to feedback without waiting out the presentation clock. */
-  skipToFeedback: () => void;
+  /** Length of the window currently on screen, including any granted minutes. */
+  phaseSeconds: number;
   ensureAudio: () => void;
 }
 
 /**
- * One slot's clock, as a single elapsed figure read off the wall clock rather
- * than accumulated a tick at a time. Ticking would drift, and — worse for a
- * projected clock — browsers throttle timers hard in a background tab, so the
- * room would silently be given extra minutes. Here the interval only decides
- * *when* to re-read `Date.now()`; a throttled tab shows the right time the
- * moment it is foregrounded again.
+ * One slot's clock, read off the session rather than kept in this browser, and
+ * derived from a single elapsed figure rather than accumulated a tick at a time.
  *
- * The phase boundary is derived from that one figure, so the clock and the
- * phase can never disagree.
+ * Ticking would drift, and — worse for a projected clock — browsers throttle
+ * timers hard in a background tab, so the room would silently be given extra
+ * minutes. Here the interval only decides *when* to re-read `Date.now()`; a
+ * throttled tab, or a phone that was asleep, shows the right time the moment it
+ * comes back. The phase boundary is derived from the same figure, so the clock
+ * and the phase can never disagree.
+ *
+ * Devices read their own wall clock against a server timestamp, so a device
+ * whose clock is minutes out shows a time that is minutes out. Phones and
+ * laptops keep themselves within a second or so of real time, which is well
+ * inside what a presentation clock needs.
  */
 export function usePresenterTimer(
   presentationMinutes: number,
   feedbackMinutes: number,
+  clock: SharedClock,
 ): PresenterTimer {
-  const presentationMs = Math.round(presentationMinutes * MINUTE_MS);
-  const feedbackMs = Math.round(feedbackMinutes * MINUTE_MS);
+  const { clockStartedAt, clockElapsedMs } = clock;
+  const running = clockStartedAt !== undefined;
 
-  // Wall-clock instant the running slot is measured from; null while paused.
-  const [startedAt, setStartedAt] = useState<number | null>(null);
-  // Where the clock was left when it was last paused.
-  const [pausedElapsedMs, setPausedElapsedMs] = useState(0);
-  // What the last tick read. Render uses only this, never Date.now().
-  const [elapsedMs, setElapsedMs] = useState(0);
-  // "+1 minute" lengthens whichever window is on screen.
-  const [bonusPresentationMs, setBonusPresentationMs] = useState(0);
-  const [bonusFeedbackMs, setBonusFeedbackMs] = useState(0);
+  const presentationEndMs = minutesToMs(presentationMinutes) + (clock.bonusPresentationMs ?? 0);
+  const slotEndMs =
+    presentationEndMs + minutesToMs(feedbackMinutes) + (clock.bonusFeedbackMs ?? 0);
 
-  const presentationEndMs = presentationMs + bonusPresentationMs;
-  const slotEndMs = presentationEndMs + feedbackMs + bonusFeedbackMs;
+  // What the last tick read off the wall clock. Only ticks while running; a
+  // paused clock reads the figure the pause banked instead.
+  const now = useNow(running);
+
+  const elapsedMs = running ? Math.max(0, now - clockStartedAt) : (clockElapsedMs ?? 0);
+
   const phase: TimerPhase = elapsedMs < presentationEndMs ? "presentation" : "feedback";
-  const running = startedAt !== null;
 
   const { ensureAudio, chime } = useChime();
-  // Each chime belongs to one crossing, not to every tick past it.
-  const handoverChimedRef = useRef(false);
-  const endChimedRef = useRef(false);
+  // Each chime belongs to one crossing of its mark, not to every tick past it.
+  // `null` until the first reading: a device that opens mid-talk, or an admin
+  // who grants another minute and then runs out of it again, must not replay a
+  // chime the room has already heard — but a mark that moves back in front of
+  // the clock (another minute granted, or a reset) is armed again.
+  const handoverChimedRef = useRef<boolean | null>(null);
+  const endChimedRef = useRef<boolean | null>(null);
 
-  // The tick: re-read the wall clock, and sound the two marks as they pass.
   // One tone hands over to feedback, three lower ones end the slot, so the room
   // can tell them apart without looking up.
   useEffect(() => {
-    if (startedAt === null) return;
-    const id = setInterval(() => {
-      const elapsed = Date.now() - startedAt;
-      if (elapsed >= presentationEndMs && !handoverChimedRef.current) {
-        handoverChimedRef.current = true;
-        chime(1, 880);
-      }
-      if (elapsed >= slotEndMs && !endChimedRef.current) {
-        endChimedRef.current = true;
-        chime(3, 660);
-      }
-      setElapsedMs(elapsed);
-    }, TICK_MS);
-    return () => clearInterval(id);
-  }, [startedAt, presentationEndMs, slotEndMs, chime]);
+    const pastHandover = elapsedMs >= presentationEndMs;
+    const pastEnd = elapsedMs >= slotEndMs;
+    const first = handoverChimedRef.current === null;
 
-  const toggle = useCallback(() => {
-    ensureAudio();
-    if (startedAt !== null) {
-      const elapsed = Date.now() - startedAt;
-      setPausedElapsedMs(elapsed);
-      setElapsedMs(elapsed);
-      setStartedAt(null);
-    } else {
-      setStartedAt(Date.now() - pausedElapsedMs);
-    }
-  }, [startedAt, pausedElapsedMs, ensureAudio]);
+    if (!first && pastHandover && !handoverChimedRef.current) chime(1, 880);
+    if (!first && pastEnd && !endChimedRef.current) chime(3, 660);
 
-  const reset = useCallback(() => {
-    handoverChimedRef.current = false;
-    endChimedRef.current = false;
-    setStartedAt(null);
-    setPausedElapsedMs(0);
-    setElapsedMs(0);
-    setBonusPresentationMs(0);
-    setBonusFeedbackMs(0);
-  }, []);
+    handoverChimedRef.current = pastHandover;
+    endChimedRef.current = pastEnd;
+  }, [elapsedMs, presentationEndMs, slotEndMs, chime]);
 
-  const addMinute = useCallback(() => {
-    if (phase === "presentation") {
-      setBonusPresentationMs((ms) => ms + MINUTE_MS);
-    } else {
-      // Granting more feedback time re-arms the end chime for the new mark.
-      endChimedRef.current = false;
-      setBonusFeedbackMs((ms) => ms + MINUTE_MS);
-    }
-  }, [phase]);
-
-  const skipToFeedback = useCallback(() => {
-    if (phase !== "presentation") return;
-    ensureAudio();
-    // The admin moved things on deliberately — no need to chime at them.
-    handoverChimedRef.current = true;
-    if (startedAt !== null) setStartedAt(Date.now() - presentationEndMs);
-    else setPausedElapsedMs(presentationEndMs);
-    setElapsedMs(presentationEndMs);
-  }, [phase, startedAt, presentationEndMs, ensureAudio]);
-
-  const remainingMs = (phase === "presentation" ? presentationEndMs : slotEndMs) - elapsedMs;
+  const phaseEndMs = phase === "presentation" ? presentationEndMs : slotEndMs;
 
   return {
     phase,
-    secondsLeft: Math.ceil(remainingMs / 1000),
+    secondsLeft: Math.ceil((phaseEndMs - elapsedMs) / 1000),
     running,
     overrun: elapsedMs >= slotEndMs,
-    toggle,
-    reset,
-    addMinute,
-    skipToFeedback,
+    phaseSeconds: Math.round(
+      (phase === "presentation" ? presentationEndMs : slotEndMs - presentationEndMs) / 1000,
+    ),
     ensureAudio,
   };
 }

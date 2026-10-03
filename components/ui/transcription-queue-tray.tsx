@@ -8,7 +8,7 @@ import { api } from "@/convex/_generated/api";
 import { useToast } from "@/components/providers/toast-provider";
 import { transcribeAudio } from "@/lib/transcribe";
 import { QueuedUpdate, useTranscriptionQueue } from "@/lib/transcription-queue";
-import { iconButtonClass } from "./button";
+import { Button } from "@/components/ui/button";
 
 const ENTER = {
   initial: { opacity: 0, y: 12 },
@@ -88,10 +88,10 @@ export function TranscriptionQueueTray() {
           <motion.div
             key="waiting"
             {...ENTER}
-            className="pointer-events-auto flex items-center gap-2.5 rounded-media border border-hairline bg-card-raised px-3.5 py-2.5 text-sm shadow-float"
+            className="pointer-events-auto flex items-center gap-2.5 rounded-lg border border-border bg-popover px-3.5 py-2.5 text-sm shadow-lg"
           >
-            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted" />
-            <span className="text-muted">
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
+            <span className="text-muted-foreground">
               Transcribing {waiting} {waiting === 1 ? "update" : "updates"}…
             </span>
           </motion.div>
@@ -101,31 +101,35 @@ export function TranscriptionQueueTray() {
           <motion.div
             key={item.id}
             {...ENTER}
-            className="pointer-events-auto flex items-start gap-2.5 rounded-media border border-danger-line bg-card-raised px-3.5 py-2.5 text-sm shadow-float"
+            className="pointer-events-auto flex items-start gap-2.5 rounded-lg border border-danger-line bg-popover px-3.5 py-2.5 text-sm shadow-lg"
           >
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
             <div className="flex-1">
-              <p className="text-ink">{item.label}</p>
+              <p className="text-foreground">{item.label}</p>
               <p className="text-xs text-danger">{item.error}</p>
             </div>
-            <button
+            <Button
               type="button"
               onClick={() => useTranscriptionQueue.getState().retry(item.id)}
               aria-label={`Retry ${item.label}`}
               title="Retry"
-              className={iconButtonClass()}
+              variant="ghost"
+              size="icon-sm"
+              className="text-muted-foreground"
             >
               <RotateCw className="h-4 w-4" />
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={() => useTranscriptionQueue.getState().remove(item.id)}
               aria-label={`Discard ${item.label}`}
               title="Discard — the recording is lost"
-              className={iconButtonClass("danger")}
+              variant="ghost"
+              size="icon-sm"
+              className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
             >
               <X className="h-4 w-4" />
-            </button>
+            </Button>
           </motion.div>
         ))}
       </AnimatePresence>

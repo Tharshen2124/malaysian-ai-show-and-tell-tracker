@@ -7,7 +7,7 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useToast } from "@/components/providers/toast-provider";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { iconButtonClass } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { UpdateFormModal } from "@/components/forms/update-form-modal";
 
 interface UpdateAdminActionsProps {
@@ -29,16 +29,24 @@ export function UpdateAdminActions({ update }: UpdateAdminActionsProps) {
 
   return (
     <span className="flex shrink-0 items-center gap-1">
-      <button aria-label="Edit update" onClick={() => setEditing(true)} className={iconButtonClass()}>
+      <Button
+        aria-label="Edit update"
+        onClick={() => setEditing(true)}
+        variant="ghost"
+        size="icon-sm"
+        className="text-muted-foreground"
+      >
         <Pencil className="h-3.5 w-3.5" />
-      </button>
-      <button
+      </Button>
+      <Button
         aria-label="Delete update"
         onClick={() => setConfirming(true)}
-        className={iconButtonClass("danger")}
+        variant="ghost"
+        size="icon-sm"
+        className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
       >
         <Trash2 className="h-3.5 w-3.5" />
-      </button>
+      </Button>
       <UpdateFormModal open={editing} onClose={() => setEditing(false)} initial={update} />
       <ConfirmDialog
         open={confirming}

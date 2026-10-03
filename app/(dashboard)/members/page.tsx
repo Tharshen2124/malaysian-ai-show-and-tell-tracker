@@ -9,9 +9,10 @@ import { MemberCard } from "@/components/cards/member-card";
 import { MemberForm } from "@/components/forms/member-form";
 import { ModalLayout } from "@/components/ui/modal-layout";
 import { Pagination } from "@/components/ui/pagination";
+import { Input } from "@/components/ui/input";
 import { CardGridSkeleton } from "@/components/ui/skeletons";
 import { EmptyState } from "@/components/ui/error-state";
-import { buttonClass } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   MEMBER_ACTIVE_FILTER_LABELS,
   MEMBER_SORT_LABELS,
@@ -71,37 +72,37 @@ export default function MembersPage() {
   const members = searching ? searchResults : list?.data;
 
   const optionClass =
-    "flex w-full items-center justify-between rounded-button px-2 py-1.5 text-sm hover:bg-recessed max-sm:min-h-11";
+    "flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-muted max-sm:min-h-11";
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="page-title">Members</h1>
+        <h1 className="text-3xl tracking-tight">Members</h1>
         {/* Active filter chip at md+ */}
-        <span className="hidden rounded-full border border-hairline px-2.5 py-1 text-[0.72rem] text-muted md:inline">
+        <span className="hidden rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground md:inline">
           {MEMBER_ACTIVE_FILTER_LABELS[activeFilter]}
         </span>
 
         <div className="ml-auto flex items-center gap-2">
           {isAdmin && (
-            <button onClick={() => setCreating(true)} className={buttonClass("primary")}>
+            <Button onClick={() => setCreating(true)} variant="default">
               <UserPlus className="h-4 w-4" />
               New Member
-            </button>
+            </Button>
           )}
           {/* Filter + sort popover */}
           <div ref={filterRef} className="relative">
-            <button
+            <Button
               onClick={() => setFilterOpen((o) => !o)}
               aria-expanded={filterOpen}
-              className={buttonClass("outline")}
+              variant="outline"
             >
               <ListFilter className="h-4 w-4" />
               Filter
-            </button>
+            </Button>
             {filterOpen && (
-              <div className="absolute right-0 z-30 mt-1 w-64 rounded-media border border-hairline bg-card-raised p-3 shadow-float">
-                <p className="kicker mb-2">Show</p>
+              <div className="absolute right-0 z-30 mt-1 w-64 rounded-lg border border-border bg-popover p-3 shadow-lg">
+                <p className="text-xs font-medium text-muted-foreground mb-2">Show</p>
                 <div className="space-y-1">
                   {(Object.keys(MEMBER_ACTIVE_FILTER_LABELS) as MemberActiveFilter[]).map(
                     (filter) => (
@@ -116,7 +117,9 @@ export default function MembersPage() {
                     ),
                   )}
                 </div>
-                <p className="kicker mt-3 mb-2 border-t border-hairline pt-3">Sort by</p>
+                <p className="text-xs font-medium text-muted-foreground mt-3 mb-2 border-t border-border pt-3">
+                  Sort by
+                </p>
                 <div className="space-y-1">
                   {(Object.keys(MEMBER_SORT_LABELS) as MemberSort[]).map((sort) => (
                     <button
@@ -140,18 +143,18 @@ export default function MembersPage() {
 
       {/* Search */}
       <div className="relative max-w-md">
-        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-faint" />
-        <input
+        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           placeholder="Search members by name…"
-          className="field-input pr-9 pl-9"
+          className="pr-9 pl-9"
         />
         {searchInput && (
           <button
             aria-label="Clear search"
             onClick={() => setSearchInput("")}
-            className="absolute top-1/2 right-3 -translate-y-1/2 text-faint hover:text-ink"
+            className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </button>

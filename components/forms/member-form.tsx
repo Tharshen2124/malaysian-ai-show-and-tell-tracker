@@ -8,8 +8,9 @@ import { Id } from "@/convex/_generated/dataModel";
 import { useToast } from "@/components/providers/toast-provider";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { InlineErrorBanner } from "@/components/ui/error-state";
-import { buttonClass } from "@/components/ui/button";
-import { Field, inputClass } from "./field";
+import { Button } from "@/components/ui/button";
+import { Field, nativeSelectClass } from "./field";
+import { Input } from "@/components/ui/input";
 import { todayISO } from "@/lib/format";
 
 const schema = z.object({
@@ -113,22 +114,16 @@ export function MemberForm({
       {error && <InlineErrorBanner message={error} />}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Name">
-          <input value={values.name} onChange={(e) => set("name", e.target.value)} className={inputClass} />
+          <Input value={values.name} onChange={(e) => set("name", e.target.value)} />
         </Field>
         <Field label="Email">
-          <input
-            type="email"
-            value={values.email}
-            onChange={(e) => set("email", e.target.value)}
-            className={inputClass}
-          />
+          <Input type="email" value={values.email} onChange={(e) => set("email", e.target.value)} />
         </Field>
         <Field label="Register date">
-          <input
+          <Input
             type="date"
             value={values.registerDate}
             onChange={(e) => set("registerDate", e.target.value)}
-            className={inputClass}
           />
         </Field>
       </div>
@@ -136,7 +131,7 @@ export function MemberForm({
         <select
           value={values.accessLevel}
           onChange={(e) => set("accessLevel", e.target.value as AccessChoice)}
-          className={inputClass}
+          className={nativeSelectClass}
         >
           {(Object.keys(ACCESS_LABELS) as AccessChoice[]).map((level) => (
             <option key={level} value={level}>
@@ -144,9 +139,9 @@ export function MemberForm({
             </option>
           ))}
         </select>
-        <p className="mt-1.5 text-xs text-faint">
-          Anything other than “No access” lets this person sign in with the Google account
-          matching their email above.
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          Anything other than “No access” lets this person sign in with the Google account matching
+          their email above.
         </p>
       </Field>
       <label className="flex cursor-pointer items-center gap-2.5 text-sm">
@@ -159,9 +154,9 @@ export function MemberForm({
         Is this member active?
       </label>
       <div className="flex justify-end gap-2 pt-2">
-        <button type="button" onClick={onCancel} className={buttonClass("outline")}>
+        <Button type="button" onClick={onCancel} variant="outline">
           Cancel
-        </button>
+        </Button>
         <SubmitButton pending={pending}>{initial?.id ? "Save changes" : "Add member"}</SubmitButton>
       </div>
     </form>

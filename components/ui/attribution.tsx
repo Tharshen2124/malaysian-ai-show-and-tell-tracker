@@ -10,7 +10,7 @@ export function Attribution() {
         href="https://hackerspacemmu.rocks/"
         target="_blank"
         rel="noreferrer noopener"
-        className="underline underline-offset-2 transition-colors hover:text-ink"
+        className="underline underline-offset-2 transition-colors hover:text-foreground"
       >
         Hackerspace MMU
       </a>

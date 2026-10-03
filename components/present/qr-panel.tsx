@@ -4,7 +4,8 @@ import { useState, useSyncExternalStore } from "react";
 import QRCode from "react-qr-code";
 import { Check, Copy } from "lucide-react";
 import { useToast } from "@/components/providers/toast-provider";
-import { iconButtonClass } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 /**
  * The QR is always dark-on-white, in its own white plate, in both themes. An
@@ -44,10 +45,10 @@ export function QrPanel({ code }: { code: string }) {
 
   return (
     <section className="space-y-3">
-      <h2 className="kicker">Scan to join</h2>
+      <h2 className="text-xs font-medium text-muted-foreground">Scan to join</h2>
 
-      <div className="card-surface p-5">
-        <div className="mx-auto w-full max-w-xs rounded-media bg-white p-5">
+      <Card className="gap-0 p-5">
+        <div className="mx-auto w-full max-w-xs rounded-lg bg-white p-5">
           {joinUrl ? (
             <QRCode
               value={joinUrl}
@@ -64,31 +65,35 @@ export function QrPanel({ code }: { code: string }) {
         </div>
 
         <div className="mt-5 text-center">
-          <p className="kicker">Too far to scan? Go to</p>
-          <p className="mt-1 text-lg font-bold break-all text-heading">{enterCodeAt ?? "…"}</p>
-          <p className="kicker mt-3">and enter the code</p>
+          <p className="text-xs font-medium text-muted-foreground">Too far to scan? Go to</p>
+          <p className="mt-1 text-lg font-bold break-all text-foreground">{enterCodeAt ?? "…"}</p>
+          <p className="text-xs font-medium text-muted-foreground mt-3">and enter the code</p>
           {/* Atkinson Hyperlegible is built to keep look-alike characters apart,
               which is exactly the job of a code read off a projector. */}
-          <p className="mt-1 text-4xl font-bold tracking-[0.2em] text-heading tabular-nums">{code}</p>
+          <p className="mt-1 text-4xl font-bold tracking-[0.2em] text-foreground tabular-nums">
+            {code}
+          </p>
         </div>
 
         <div className="mt-4 flex items-center gap-2">
-          <code className="min-w-0 flex-1 truncate rounded-button border border-hairline bg-page px-3 py-2 text-xs text-muted">
+          <code className="min-w-0 flex-1 truncate rounded-md border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
             {joinUrl ?? "…"}
           </code>
-          <button
+          <Button
             onClick={copy}
             disabled={!joinUrl}
             aria-label="Copy the join link"
-            className={`${iconButtonClass()} border border-hairline px-3 py-2 max-sm:h-11 max-sm:w-11`}
+            variant="ghost"
+            size="icon-sm"
+            className="text-muted-foreground border border-border px-3 py-2 max-sm:h-11 max-sm:w-11"
           >
             {copied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
 
-      <p className="text-xs text-faint">
-        Names appear on the right the moment someone submits — no refresh needed.
+      <p className="text-xs text-muted-foreground">
+        Names appear in the order the moment someone submits — no refresh needed.
       </p>
     </section>
   );

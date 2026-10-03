@@ -21,7 +21,7 @@ import { ModalLayout } from "@/components/ui/modal-layout";
 import { StatusPill } from "@/components/ui/status-pill";
 import { NullTextIndicator } from "@/components/ui/null-text-indicator";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { iconButtonClass } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { ProjectFormModal } from "@/components/forms/project-form-modal";
 import { MemberForm } from "@/components/forms/member-form";
 import { UpdateAdminActions } from "./update-admin-actions";
@@ -43,11 +43,11 @@ function Metric({
 }) {
   return (
     <div className="flex items-center justify-between gap-2 text-sm">
-      <span className="flex items-center gap-1.5 text-muted">
-        <Icon className="h-3.5 w-3.5 text-faint" />
+      <span className="flex items-center gap-1.5 text-muted-foreground">
+        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
         {label}
       </span>
-      <span className="text-ink tabular-nums">{value}</span>
+      <span className="text-foreground tabular-nums">{value}</span>
     </div>
   );
 }
@@ -59,10 +59,10 @@ export function MemberCard({ member }: { member: MemberListItem }) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="card-surface w-full p-4 text-left transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-line"
+        className="rounded-xl border bg-card text-card-foreground shadow-sm w-full p-4 text-left transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-border-hover"
       >
         <div className="flex items-start justify-between gap-2">
-          <h3 className="text-[1.2rem]">{member.name}</h3>
+          <h3 className="text-base font-semibold">{member.name}</h3>
           <StatusPill isActive={member.isActive} />
         </div>
         <div className="mt-4 space-y-2">
@@ -94,13 +94,13 @@ function ProjectSection({ project }: { project: MemberProject }) {
   const [confirming, setConfirming] = useState(false);
 
   return (
-    <div className="rounded-media border border-hairline bg-card p-3.5">
+    <div className="rounded-lg border border-border bg-card p-3.5">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-[1.05rem] leading-tight font-bold text-heading">
+          <p className="text-sm font-semibold leading-tight font-bold text-foreground">
             {project.name}
           </p>
-          <p className="text-xs text-faint">
+          <p className="text-xs text-muted-foreground">
             {PROJECT_CATEGORY_LABELS[project.category]}
             {project.completed ? " · Completed" : ""}
             {" · "}
@@ -109,27 +109,35 @@ function ProjectSection({ project }: { project: MemberProject }) {
         </div>
         {isAdmin && (
           <span className="flex shrink-0 items-center gap-1">
-            <button aria-label="Edit project" onClick={() => setEditing(true)} className={iconButtonClass()}>
+            <Button
+              aria-label="Edit project"
+              onClick={() => setEditing(true)}
+              variant="ghost"
+              size="icon-sm"
+              className="text-muted-foreground"
+            >
               <Pencil className="h-3.5 w-3.5" />
-            </button>
-            <button
+            </Button>
+            <Button
               aria-label="Delete project"
               onClick={() => setConfirming(true)}
-              className={iconButtonClass("danger")}
+              variant="ghost"
+              size="icon-sm"
+              className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
             >
               <Trash2 className="h-3.5 w-3.5" />
-            </button>
+            </Button>
           </span>
         )}
       </div>
 
       {project.updates.length > 0 && (
-        <ul className="mt-3 space-y-2 border-t border-hairline pt-3">
+        <ul className="mt-3 space-y-2 border-t border-border pt-3">
           {project.updates.map((u) => (
             <li key={u._id} className="text-sm">
               <div className="flex items-start justify-between gap-2">
-                <span className="text-muted">
-                  <span className="text-ink">Meetup #{u.meetupNumber}</span> ·{" "}
+                <span className="text-muted-foreground">
+                  <span className="text-foreground">Meetup #{u.meetupNumber}</span> ·{" "}
                   {formatDate(u.meetupDate)} · by {u.memberName}
                 </span>
                 {isAdmin && (
@@ -144,7 +152,7 @@ function ProjectSection({ project }: { project: MemberProject }) {
                   />
                 )}
               </div>
-              <p className="text-soft">{u.description}</p>
+              <p className="text-muted-foreground">{u.description}</p>
             </li>
           ))}
         </ul>
@@ -205,7 +213,7 @@ export function MemberDetailModal({
         member && (
           <Link
             href={`/members/${member._id}`}
-            className="text-sm underline underline-offset-[0.22em] transition-colors hover:text-muted"
+            className="text-sm underline underline-offset-[0.22em] transition-colors hover:text-muted-foreground"
           >
             View full page →
           </Link>
@@ -215,50 +223,53 @@ export function MemberDetailModal({
         isAdmin &&
         member && (
           <>
-            <button aria-label="Edit member" onClick={() => setEditing(true)} className={iconButtonClass()}>
+            <Button
+              aria-label="Edit member"
+              onClick={() => setEditing(true)}
+              variant="ghost"
+              size="icon-sm"
+              className="text-muted-foreground"
+            >
               <Pencil className="h-4 w-4" />
-            </button>
-            <button
+            </Button>
+            <Button
               aria-label="Delete member"
               onClick={() => setConfirming(true)}
-              className={iconButtonClass("danger")}
+              variant="ghost"
+              size="icon-sm"
+              className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
             >
               <Trash2 className="h-4 w-4" />
-            </button>
+            </Button>
           </>
         )
       }
     >
       {!member ? (
         <div className="space-y-3 py-2">
-          <div className="h-5 w-40 animate-pulse rounded-[0.3rem] bg-recessed" />
-          <div className="h-24 animate-pulse rounded-[0.3rem] bg-recessed" />
+          <div className="h-5 w-40 animate-pulse rounded-[0.3rem] bg-muted" />
+          <div className="h-24 animate-pulse rounded-[0.3rem] bg-muted" />
         </div>
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill isActive={member.isActive} />
-            <span className="text-sm text-muted">
+            <span className="text-sm text-muted-foreground">
               Active for {member.durationActive} · {member.totalUpdates} updates ·{" "}
               {member.meetupsSinceLastTalk} meetups since last talk
             </span>
           </div>
           <div className="mt-5 space-y-3">
-            <h3 className="kicker">Projects</h3>
+            <h3 className="text-xs font-medium text-muted-foreground">Projects</h3>
             {member.projects.length === 0 && (
-              <p className="py-4 text-center text-sm text-faint">No projects yet.</p>
+              <p className="py-4 text-center text-sm text-muted-foreground">No projects yet.</p>
             )}
             {member.projects.map((project) => (
               <ProjectSection key={project._id} project={project} />
             ))}
           </div>
 
-          <ModalLayout
-            open={editing}
-            onClose={() => setEditing(false)}
-            title="Edit Member"
-            wide
-          >
+          <ModalLayout open={editing} onClose={() => setEditing(false)} title="Edit Member" wide>
             {/* Mounted only while open, so state resets every time the modal reopens. */}
             {editing && (
               <MemberForm
